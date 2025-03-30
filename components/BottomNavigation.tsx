@@ -2,7 +2,7 @@ import React from 'react';
 import { View, StyleSheet, Pressable, Platform } from 'react-native';
 import { Text } from 'react-native-paper';
 import { useRouter, usePathname } from 'expo-router';
-import { Chrome as Home, Building2, CreditCard, Receipt, Wallet, User, Users } from 'lucide-react-native';
+import { Chrome as Home, Building2, CreditCard, Receipt, User, Users, PiggyBank } from 'lucide-react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -35,9 +35,9 @@ const routes: Route[] = [
     icon: Receipt,
   },
   {
-    name: 'Finances',
-    path: '/finances',
-    icon: Wallet,
+    name: 'Banking',
+    path: '/banking',
+    icon: PiggyBank,
   },
   {
     name: 'Profile',
