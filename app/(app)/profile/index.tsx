@@ -1,18 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Platform, Pressable, Dimensions } from 'react-native';
+import { View, StyleSheet, ScrollView, Platform, Pressable, Dimensions, Image } from 'react-native';
 import { Text, Button, TextInput, HelperText, Portal, Modal } from 'react-native-paper';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { supabase } from '@/lib/supabase';
 import { User, Mail, Phone, Calendar, LogOut, Settings, Shield, Bell, Building2, MapPin, Check, Plus } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
-const cardWidth = (width - 40) / 2; // 2 cards per row with 16px padding on each side and 8px gap between cards
+const cardWidth = (width - 40) / 2;
 
 export default function ProfileScreen() {
   const { session, signOut } = useAuth();
@@ -108,232 +109,236 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#4f46e5', '#4338ca']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.titleContainer}>
-            <View style={styles.titleIcon}>
-              <User size={24} color="#ffffff" strokeWidth={2.5} />
+    <View style={styles.wrapper}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&auto=format&fit=crop&q=80' }}
+            style={[StyleSheet.absoluteFillObject, { opacity: 0.9 }]}
+            blurRadius={70}
+          />
+          <Animated.View 
+            entering={FadeInDown.duration(600).springify()}
+            style={styles.headerContent}>
+            <View style={styles.titleContainer}>
+              <View style={styles.titleIcon}>
+                <User size={24} color="#ffffff" strokeWidth={2.5} />
+              </View>
+              <View style={styles.titleWrapper}>
+                <Text style={styles.headerTitle}>Profile</Text>
+                <Text style={styles.headerSubtitle}>Manage your account settings</Text>
+              </View>
             </View>
-            <View style={styles.titleWrapper}>
-              <Text style={styles.headerTitle}>Profile</Text>
-              <Text style={styles.headerSubtitle}>Manage your account settings</Text>
+
+            <View style={styles.profileContainer}>
+              <View style={styles.avatarContainer}>
+                <View style={styles.avatar}>
+                  <User size={40} color="#ffffff" strokeWidth={2.5} />
+                </View>
+              </View>
+              <Text style={styles.profileName}>{profile.full_name || 'User'}</Text>
+              <Text style={styles.profileEmail}>{session?.user?.email}</Text>
             </View>
-          </View>
+          </Animated.View>
         </View>
 
-        <View style={styles.profileContainer}>
-          <View style={styles.avatarContainer}>
-            <View style={styles.avatar}>
-              <User size={40} color="#ffffff" strokeWidth={2.5} />
+        <View style={styles.content}>
+          <AnimatedView 
+            entering={FadeInUp.duration(300).delay(100)}
+            style={styles.section}
+          >
+            <View style={styles.sectionHeader}>
+              <Mail size={20} color="#6366f1" strokeWidth={2.5} />
+
             </View>
-          </View>
-          <Text style={styles.profileName}>{profile.full_name || 'User'}</Text>
-          <Text style={styles.profileEmail}>{session?.user?.email}</Text>
-        </View>
-      </LinearGradient>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <AnimatedView 
-          entering={FadeInUp.duration(300).delay(100)}
-          style={styles.section}
-        >
-          <View style={styles.sectionHeader}>
-            <Building2 size={20} color="#4f46e5" strokeWidth={2.5} />
-            <Text style={styles.sectionTitle}>Your Businesses</Text>
-          </View>
+            <View style={styles.card}>
+              <View style={styles.accountGrid}>
+                <View style={styles.accountInput}>
+                  <TextInput
+                    mode="outlined"
+                    label="Full Name"
+                    value={profile.full_name}
+                    onChangeText={(text) => setProfile(prev => ({ ...prev, full_name: text }))}
+                    style={styles.input}
+                  />
+                </View>
+                <View style={styles.accountInput}>
+                  <TextInput
+                    mode="outlined"
+                    label="Phone"
+                    value={profile.phone}
+                    onChangeText={(text) => setProfile(prev => ({ ...prev, phone: text }))}
+                    keyboardType="phone-pad"
+                    style={styles.input}
+                  />
+                </View>
+              </View>
 
-          <View style={styles.businessList}>
-            {businesses.map((business) => (
-              <AnimatedView 
-                key={business.id}
-                entering={FadeInUp.duration(300)}
-                style={[styles.cardWrapper, { width: cardWidth }]}
+              <TextInput
+                mode="outlined"
+                label="Email"
+                value={session?.user?.email || ''}
+                disabled
+                style={styles.input}
+              />
+
+              {error && (
+                <HelperText type="error" visible={true}>
+                  {error}
+                </HelperText>
+              )}
+
+              <Button
+                mode="contained"
+                onPress={updateProfile}
+                loading={loading}
+                style={styles.updateButton}
               >
-                <Pressable 
-                  style={[
-                    styles.businessCard,
-                    selectedBusiness?.id === business.id && styles.selectedCard
-                  ]} 
+                Update Profile
+              </Button>
+            </View>
+          </AnimatedView>
+
+          <AnimatedView 
+            entering={FadeInUp.duration(300).delay(200)}
+            style={styles.section}
+          >
+            <View style={styles.sectionHeader}>
+              <Building2 size={20} color="#6366f1" strokeWidth={2.5} />
+              <Text style={styles.sectionTitle}>Your Businesses</Text>
+            </View>
+
+            <View style={styles.businessList}>
+              {businesses.map((business, index) => (
+                <AnimatedPressable 
+                  key={business.id}
+                  entering={FadeInUp.duration(400).delay(200 + index * 100)}
+                  style={[styles.cardWrapper, { width: cardWidth }]}
                   onPress={() => selectBusiness(business)}
                 >
-                  <View style={styles.businessContent}>
-                    <View style={[
-                      styles.businessIcon,
-                      selectedBusiness?.id === business.id && styles.selectedIcon
-                    ]}>
-                      <Building2 
-                        size={24} 
-                        color={selectedBusiness?.id === business.id ? '#ffffff' : '#4f46e5'} 
-                        strokeWidth={2.5}
-                      />
-                    </View>
-                    <Text style={[
-                      styles.businessName,
-                      selectedBusiness?.id === business.id && styles.selectedBusinessName
-                    ]}>
-                      {business.name}
-                    </Text>
-                    {selectedBusiness?.id === business.id && (
-                      <View style={styles.selectedBadge}>
-                        <Check size={16} color="#ffffff" strokeWidth={2.5} />
-                        <Text style={styles.selectedText}>Active</Text>
+                  <View style={[
+                    styles.businessCard,
+                    selectedBusiness?.id === business.id && styles.selectedCard
+                  ]}>
+                    <View style={styles.businessContent}>
+                      <View style={[
+                        styles.businessIcon,
+                        selectedBusiness?.id === business.id && styles.selectedIcon
+                      ]}>
+                        <Building2 
+                          size={24} 
+                          color={selectedBusiness?.id === business.id ? '#ffffff' : '#6366f1'} 
+                          strokeWidth={2.5}
+                        />
                       </View>
-                    )}
+                      <Text style={[
+                        styles.businessName,
+                        selectedBusiness?.id === business.id && styles.selectedBusinessName
+                      ]}>
+                        {business.name}
+                      </Text>
+                      {selectedBusiness?.id === business.id && (
+                        <View style={styles.selectedBadge}>
+                          <Check size={16} color="#ffffff" strokeWidth={2.5} />
+                          <Text style={styles.selectedText}>Active</Text>
+                        </View>
+                      )}
+                    </View>
                   </View>
-                </Pressable>
-              </AnimatedView>
-            ))}
-          </View>
-
-          <Button
-            mode="outlined"
-            onPress={() => setModalVisible(true)}
-            style={styles.addBusinessButton}
-            icon={() => <Plus size={20} color="#4f46e5" strokeWidth={2.5} />}
-          >
-            Add Business
-          </Button>
-        </AnimatedView>
-
-        <AnimatedView 
-          entering={FadeInUp.duration(300).delay(200)}
-          style={styles.section}
-        >
-          <View style={styles.sectionHeader}>
-            <Mail size={20} color="#4f46e5" strokeWidth={2.5} />
-            <Text style={styles.sectionTitle}>Account Information</Text>
-          </View>
-
-          <View style={styles.card}>
-            <TextInput
-              mode="outlined"
-              label="Full Name"
-              value={profile.full_name}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, full_name: text }))}
-              style={styles.input}
-            />
-
-            <TextInput
-              mode="outlined"
-              label="Email"
-              value={session?.user?.email || ''}
-              disabled
-              style={styles.input}
-            />
-
-            <TextInput
-              mode="outlined"
-              label="Phone"
-              value={profile.phone}
-              onChangeText={(text) => setProfile(prev => ({ ...prev, phone: text }))}
-              keyboardType="phone-pad"
-              style={styles.input}
-            />
-
-            {error && (
-              <HelperText type="error" visible={true}>
-                {error}
-              </HelperText>
-            )}
+                </AnimatedPressable>
+              ))}
+            </View>
 
             <Button
-              mode="contained"
-              onPress={updateProfile}
-              loading={loading}
-              style={styles.updateButton}
+              mode="outlined"
+              onPress={() => setModalVisible(true)}
+              style={styles.addBusinessButton}
+              icon={() => <Plus size={20} color="#6366f1" strokeWidth={2.5} />}
             >
-              Update Profile
+              Add Business
             </Button>
-          </View>
-        </AnimatedView>
+          </AnimatedView>
 
-        <AnimatedView 
-          entering={FadeInUp.duration(300).delay(300)}
-          style={styles.section}
-        >
-          <View style={styles.sectionHeader}>
-            <Calendar size={20} color="#4f46e5" strokeWidth={2.5} />
-            <Text style={styles.sectionTitle}>Account Details</Text>
-          </View>
-
-          <View style={styles.card}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Member Since</Text>
-              <Text style={styles.detailValue}>
-                {new Date(session?.user?.created_at || '').toLocaleDateString()}
-              </Text>
-            </View>
-
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Last Updated</Text>
-              <Text style={styles.detailValue}>
-                {new Date(session?.user?.updated_at || '').toLocaleDateString()}
-              </Text>
-            </View>
-          </View>
-        </AnimatedView>
-
-        <AnimatedView 
-          entering={FadeInUp.duration(300).delay(400)}
-          style={styles.section}
-        >
-          <View style={styles.sectionHeader}>
-            <Settings size={20} color="#4f46e5" strokeWidth={2.5} />
-            <Text style={styles.sectionTitle}>Preferences</Text>
-          </View>
-
-          <View style={styles.card}>
-            <Pressable style={styles.menuItem}>
-              <View style={styles.menuItemContent}>
-                <View style={[styles.menuIcon, { backgroundColor: '#eff6ff' }]}>
-                  <Bell size={20} color="#4f46e5" strokeWidth={2.5} />
-                </View>
-                <View style={styles.menuText}>
-                  <Text style={styles.menuTitle}>Notifications</Text>
-                  <Text style={styles.menuSubtitle}>Manage notification settings</Text>
-                </View>
-                <Text style={styles.menuValue}>On</Text>
-              </View>
-            </Pressable>
-
-            <Pressable style={styles.menuItem}>
-              <View style={styles.menuItemContent}>
-                <View style={[styles.menuIcon, { backgroundColor: '#eff6ff' }]}>
-                  <Shield size={20} color="#4f46e5" strokeWidth={2.5} />
-                </View>
-                <View style={styles.menuText}>
-                  <Text style={styles.menuTitle}>Privacy</Text>
-                  <Text style={styles.menuSubtitle}>Manage privacy settings</Text>
-                </View>
-                <Text style={styles.menuValue}>Public</Text>
-              </View>
-            </Pressable>
-          </View>
-        </AnimatedView>
-
-        <AnimatedView 
-          entering={FadeInUp.duration(300).delay(500)}
-          style={styles.section}
-        >
-          <Button
-            mode="contained"
-            onPress={signOut}
-            style={styles.signOutButton}
-            contentStyle={styles.signOutContent}
-            icon={() => <LogOut size={20} color="#ffffff" strokeWidth={2.5} />}
+          <AnimatedView 
+            entering={FadeInUp.duration(300).delay(300)}
+            style={styles.section}
           >
-            Sign Out
-          </Button>
-        </AnimatedView>
+            <View style={styles.sectionHeader}>
+              <Calendar size={20} color="#6366f1" strokeWidth={2.5} />
+              <Text style={styles.sectionTitle}>Account Details</Text>
+            </View>
+
+            <View style={styles.card}>
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Member Since</Text>
+                <Text style={styles.detailValue}>
+                  {new Date(session?.user?.created_at || '').toLocaleDateString()}
+                </Text>
+              </View>
+
+              <View style={styles.detailRow}>
+                <Text style={styles.detailLabel}>Last Updated</Text>
+                <Text style={styles.detailValue}>
+                  {new Date(session?.user?.updated_at || '').toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          </AnimatedView>
+
+          <AnimatedView 
+            entering={FadeInUp.duration(300).delay(400)}
+            style={styles.section}
+          >
+            <View style={styles.sectionHeader}>
+              <Settings size={20} color="#6366f1" strokeWidth={2.5} />
+              <Text style={styles.sectionTitle}>Preferences</Text>
+            </View>
+
+            <View style={styles.card}>
+              <Pressable style={styles.menuItem}>
+                <View style={styles.menuItemContent}>
+                  <View style={[styles.menuIcon, { backgroundColor: '#eff6ff' }]}>
+                    <Bell size={20} color="#6366f1" strokeWidth={2.5} />
+                  </View>
+                  <View style={styles.menuText}>
+                    <Text style={styles.menuTitle}>Notifications</Text>
+                    <Text style={styles.menuSubtitle}>Manage notification settings</Text>
+                  </View>
+                  <Text style={styles.menuValue}>On</Text>
+                </View>
+              </Pressable>
+
+              <Pressable style={styles.menuItem}>
+                <View style={styles.menuItemContent}>
+                  <View style={[styles.menuIcon, { backgroundColor: '#eff6ff' }]}>
+                    <Shield size={20} color="#6366f1" strokeWidth={2.5} />
+                  </View>
+                  <View style={styles.menuText}>
+                    <Text style={styles.menuTitle}>Privacy</Text>
+                    <Text style={styles.menuSubtitle}>Manage privacy settings</Text>
+                  </View>
+                  <Text style={styles.menuValue}>Public</Text>
+                </View>
+              </Pressable>
+            </View>
+          </AnimatedView>
+
+          <AnimatedView 
+            entering={FadeInUp.duration(300).delay(500)}
+            style={styles.section}
+          >
+            <Button
+              mode="contained"
+              onPress={signOut}
+              style={styles.signOutButton}
+              contentStyle={styles.signOutContent}
+              icon={() => <LogOut size={20} color="#ffffff" strokeWidth={2.5} />}
+            >
+              Sign Out
+            </Button>
+          </AnimatedView>
+        </View>
       </ScrollView>
 
       <Portal>
@@ -424,26 +429,28 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : Platform.OS === 'android' ? 48 : 20,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    height: 240,
+    backgroundColor: '#6366f1',
+    overflow: 'hidden',
   },
   headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    flex: 1,
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+    paddingHorizontal: 16,
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingTop: Platform.OS === 'android' ? 4 : 0,
+    marginBottom: 24,
   },
   titleIcon: {
     width: 40,
@@ -497,7 +504,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: 16,
+    marginTop: -48,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
   section: {
     marginBottom: 24,
@@ -515,18 +524,25 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     padding: 16,
   },
-  input: {
+  accountGrid: {
+    flexDirection: 'row',
+    gap: 12,
     marginBottom: 16,
+  },
+  accountInput: {
+    flex: 1,
+  },
+  input: {
     backgroundColor: '#ffffff',
   },
   updateButton: {
     marginTop: 8,
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#6366f1',
   },
   detailRow: {
     flexDirection: 'row',
@@ -577,11 +593,12 @@ const styles = StyleSheet.create({
   },
   menuValue: {
     fontSize: 14,
-    color: '#4f46e5',
+    color: '#6366f1',
     fontWeight: '500',
   },
   signOutButton: {
     backgroundColor: '#ef4444',
+    borderRadius: 24,
   },
   signOutContent: {
     flexDirection: 'row-reverse',
@@ -592,7 +609,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     marginBottom: 16,
-    paddingHorizontal: 8,
   },
   cardWrapper: {
     width: cardWidth,
@@ -600,14 +616,14 @@ const styles = StyleSheet.create({
   },
   businessCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: '#e2e8f0',
     padding: 12,
-    height: 56, // Slightly reduced height for better fit
+    height: 56,
   },
   selectedCard: {
-    borderColor: '#4f46e5',
+    borderColor: '#6366f1',
     backgroundColor: '#f8fafc',
   },
   businessContent: {
@@ -617,7 +633,7 @@ const styles = StyleSheet.create({
     height: '100%',
   },
   businessIcon: {
-    width: 32, // Slightly reduced icon size
+    width: 32,
     height: 32,
     borderRadius: 8,
     backgroundColor: '#eff6ff',
@@ -627,17 +643,17 @@ const styles = StyleSheet.create({
     borderColor: '#bfdbfe',
   },
   selectedIcon: {
-    backgroundColor: '#4f46e5',
-    borderColor: '#4f46e5',
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
   },
   businessName: {
     flex: 1,
-    fontSize: 13, // Slightly reduced font size
+    fontSize: 13,
     fontWeight: '600',
     color: '#1e293b',
   },
   selectedBusinessName: {
-    color: '#4f46e5',
+    color: '#6366f1',
   },
   selectedBadge: {
     flexDirection: 'row',
@@ -650,12 +666,13 @@ const styles = StyleSheet.create({
   },
   selectedText: {
     color: '#ffffff',
-    fontSize: 10, // Slightly reduced font size
+    fontSize: 10,
     fontWeight: '600',
   },
   addBusinessButton: {
-    borderColor: '#4f46e5',
+    borderColor: '#6366f1',
     marginTop: 8,
+    borderRadius: 24,
   },
   modal: {
     margin: 20,
@@ -663,7 +680,7 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: '#ffffff',
     padding: 20,
-    borderRadius: 12,
+    borderRadius: 24,
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
@@ -681,5 +698,6 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     minWidth: 100,
+    borderRadius: 24,
   },
 });

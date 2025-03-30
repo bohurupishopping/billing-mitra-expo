@@ -1,172 +1,155 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView, Platform, Dimensions, Pressable } from 'react-native';
-import { Text, Button } from 'react-native-paper';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, ScrollView, Platform, Dimensions, Pressable, Image } from 'react-native';
+import { Text } from 'react-native-paper';
 import { useAuth } from '@/contexts/AuthContext';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { Building2, Receipt, CreditCard, TrendingUp, Users, Package, ArrowRight, Wallet, ArrowUpRight, ArrowDownRight } from 'lucide-react-native';
+import { CreditCard, Receipt, ChevronRight } from 'lucide-react-native';
 import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
+import { supabase } from '@/lib/supabase';
+import { format } from 'date-fns';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 
 const AnimatedView = Animated.createAnimatedComponent(View);
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
 const cardWidth = isTablet ? (width - 48) / 3 : (width - 32) / 2;
 
+type Purchase = {
+  id: string;
+  purchase_number: string;
+  purchase_date: string;
+  item_name: string;
+  quantity: number;
+  total_price: number;
+  creditors: {
+    name: string;
+  } | null;
+};
+
 export default function HomeScreen() {
   const { session } = useAuth();
   const { selectedBusiness } = useBusiness();
+  const [recentPurchases, setRecentPurchases] = useState<Purchase[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (selectedBusiness) {
+      fetchRecentPurchases();
+    }
+  }, [selectedBusiness]);
+
+  const fetchRecentPurchases = async () => {
+    if (!selectedBusiness) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('purchases')
+        .select('*, creditors(name)')
+        .eq('business_id', selectedBusiness.id)
+        .order('purchase_date', { ascending: false })
+        .limit(4);
+
+      if (error) throw error;
+      setRecentPurchases(data || []);
+    } catch (err) {
+      console.error('Error fetching recent purchases:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const quickActions = [
+    {
+      title: 'New Payment',
+      description: 'Record a new payment',
+      icon: CreditCard,
+      route: '/payments/new' as const,
+      color: '#818cf8',
+      gradient: ['#818cf8', '#6366f1'],
+    },
+    {
+      title: 'New Purchase',
+      description: 'Record a new purchase',
+      icon: Receipt,
+      route: '/purchases/new' as const,
+      color: '#fb923c',
+      gradient: ['#fb923c', '#f97316'],
+    },
+  ];
 
   return (
-    <View style={styles.container}>
-      <LinearGradient
-        colors={['#4f46e5', '#4338ca']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.header}
-      >
-        <View style={styles.headerContent}>
-          <View style={styles.titleContainer}>
-            <View style={styles.titleIcon}>
-              <Wallet size={24} color="#ffffff" strokeWidth={2.5} />
+    <View style={styles.wrapper}>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+        <View style={styles.header}>
+          <Image
+            source={{ uri: 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800&auto=format&fit=crop&q=80' }}
+            style={[StyleSheet.absoluteFillObject, { opacity: 0.9 }]}
+            blurRadius={70}
+          />
+          <Animated.View 
+            entering={FadeInDown.duration(600).springify()}
+            style={styles.welcomeContainer}>
+            <Text style={styles.greeting}>Welcome back,</Text>
+            <Text style={styles.name}>{session?.user?.email?.split('@')[0] || 'User'}</Text>
+            <View style={styles.roleContainer}>
+              <Text style={styles.role}>Business Dashboard</Text>
             </View>
-            <View style={styles.titleWrapper}>
-              <Text style={styles.headerTitle}>Dashboard</Text>
-              <Text style={styles.headerSubtitle}>
-                Welcome back{session?.user?.email ? `, ${session.user.email.split('@')[0]}` : ''}!
-              </Text>
-            </View>
-          </View>
+          </Animated.View>
         </View>
 
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <View style={[styles.statIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-              <ArrowUpRight size={16} color="#ffffff" strokeWidth={2.5} />
-            </View>
-            <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Total Income</Text>
-              <Text style={styles.statValue}>₹45,000</Text>
-            </View>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <View style={[styles.statIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-              <ArrowDownRight size={16} color="#ffffff" strokeWidth={2.5} />
-            </View>
-            <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Total Expenses</Text>
-              <Text style={styles.statValue}>₹28,000</Text>
-            </View>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <View style={[styles.statIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-              <TrendingUp size={16} color="#ffffff" strokeWidth={2.5} />
-            </View>
-            <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Net Profit</Text>
-              <Text style={styles.statValue}>₹17,000</Text>
+        <View style={styles.content}>
+          <View style={styles.quickActions}>
+            
+            <View style={styles.quickActionsGrid}>
+              {quickActions.map((action, index) => (
+                <AnimatedPressable
+                  key={action.title}
+                  entering={FadeInUp.duration(400).delay(200 + index * 100)}
+                  style={[styles.quickActionCard, { borderColor: `${action.color}20` }]}
+                  onPress={() => router.push(action.route)}
+                >
+                  <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}15` }]}>
+                    <action.icon size={26} color={action.color} strokeWidth={2} />
+                  </View>
+                  <Text style={[styles.quickActionTitle, { color: action.gradient[1] }]}>{action.title}</Text>
+                  <Text style={styles.quickActionDescription}>{action.description}</Text>
+                </AnimatedPressable>
+              ))}
             </View>
           </View>
-        </View>
-      </LinearGradient>
 
-      <ScrollView
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.cardGrid}>
-            <AnimatedView 
-              entering={FadeInUp.duration(300).delay(100)}
-              style={[styles.cardWrapper, { width: cardWidth }]}
-            >
-              <Pressable 
-                style={styles.actionCard}
-                onPress={() => router.push('/businesses')}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: '#eff6ff' }]}>
-                  <Building2 size={24} color="#2563EB" strokeWidth={2.5} />
+          <View style={styles.recentPurchases}>
+            <Text style={styles.sectionTitle}>Recent Purchases</Text>
+            <View style={styles.purchasesList}>
+              {recentPurchases.map((purchase, index) => (
+                <AnimatedPressable
+                  key={purchase.id}
+                  entering={FadeInUp.duration(400).delay(400 + index * 100)}
+                  style={styles.purchaseCard}
+                  onPress={() => router.push(`/purchases/${purchase.id}`)}
+                >
+                  <View style={styles.purchaseContent}>
+                    <View style={styles.purchaseInfo}>
+                      <Text style={styles.purchaseItem}>{purchase.item_name}</Text>
+                      <Text style={styles.purchaseDate}>
+                        {format(new Date(purchase.purchase_date), 'MMM dd, yyyy')}
+                      </Text>
+                    </View>
+                    <View style={styles.purchaseAmount}>
+                      <Text style={styles.amountText}>₹{purchase.total_price.toLocaleString()}</Text>
+                      <ChevronRight size={16} color="#64748b" />
+                    </View>
+                  </View>
+                </AnimatedPressable>
+              ))}
+              {recentPurchases.length === 0 && !loading && (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyText}>No recent purchases</Text>
                 </View>
-                <View style={styles.actionContent}>
-                  <Text style={styles.actionTitle}>Businesses</Text>
-                  <Text style={styles.actionSubtitle}>Manage your companies</Text>
-                </View>
-                <ArrowRight size={20} color="#2563EB" style={styles.actionArrow} />
-              </Pressable>
-            </AnimatedView>
-
-            <AnimatedView 
-              entering={FadeInUp.duration(300).delay(200)}
-              style={[styles.cardWrapper, { width: cardWidth }]}
-            >
-              <Pressable 
-                style={styles.actionCard}
-                onPress={() => router.push('/purchases')}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: '#f0fdf4' }]}>
-                  <Receipt size={24} color="#16a34a" strokeWidth={2.5} />
-                </View>
-                <View style={styles.actionContent}>
-                  <Text style={styles.actionTitle}>Purchases</Text>
-                  <Text style={styles.actionSubtitle}>Track your expenses</Text>
-                </View>
-                <ArrowRight size={20} color="#16a34a" style={styles.actionArrow} />
-              </Pressable>
-            </AnimatedView>
-
-            <AnimatedView 
-              entering={FadeInUp.duration(300).delay(300)}
-              style={[styles.cardWrapper, { width: cardWidth }]}
-            >
-              <Pressable 
-                style={styles.actionCard}
-                onPress={() => router.push('/finances')}
-              >
-                <View style={[styles.actionIcon, { backgroundColor: '#fef3c7' }]}>
-                  <CreditCard size={24} color="#d97706" strokeWidth={2.5} />
-                </View>
-                <View style={styles.actionContent}>
-                  <Text style={styles.actionTitle}>Finances</Text>
-                  <Text style={styles.actionSubtitle}>Monitor cash flow</Text>
-                </View>
-                <ArrowRight size={20} color="#d97706" style={styles.actionArrow} />
-              </Pressable>
-            </AnimatedView>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Business Overview</Text>
-          <View style={styles.overviewGrid}>
-            <AnimatedView 
-              entering={FadeInUp.duration(300).delay(400)}
-              style={[styles.overviewCard, { backgroundColor: '#eff6ff' }]}
-            >
-              <View style={[styles.overviewIcon, { backgroundColor: '#dbeafe' }]}>
-                <Users size={24} color="#2563eb" strokeWidth={2.5} />
-              </View>
-              <View style={styles.overviewContent}>
-                <Text style={styles.overviewValue}>28</Text>
-                <Text style={styles.overviewLabel}>Total Customers</Text>
-              </View>
-            </AnimatedView>
-
-            <AnimatedView 
-              entering={FadeInUp.duration(300).delay(500)}
-              style={[styles.overviewCard, { backgroundColor: '#f0fdf4' }]}
-            >
-              <View style={[styles.overviewIcon, { backgroundColor: '#dcfce7' }]}>
-                <Package size={24} color="#16a34a" strokeWidth={2.5} />
-              </View>
-              <View style={styles.overviewContent}>
-                <Text style={styles.overviewValue}>156</Text>
-                <Text style={styles.overviewLabel}>Total Products</Text>
-              </View>
-            </AnimatedView>
+              )}
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -175,175 +158,144 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+  },
   container: {
     flex: 1,
-    backgroundColor: '#f8fafc',
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : Platform.OS === 'android' ? 48 : 20,
+    height: 200,
+    backgroundColor: '#6366f1',
+    overflow: 'hidden',
+  },
+  welcomeContainer: {
+    alignItems: 'center',
+    paddingTop: Platform.OS === 'ios' ? 60 : 48,
+  },
+  greeting: {
+    fontSize: 16,
+    color: '#e0e7ff',
+    marginBottom: 8,
+    fontWeight: '500',
+    letterSpacing: 0.5,
+  },
+  name: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#ffffff',
+    marginBottom: 8,
+    letterSpacing: 0.5,
+  },
+  roleContainer: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  role: {
+    fontSize: 14,
+    color: '#ffffff',
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  content: {
+    flex: 1,
+    marginTop: -32,
     paddingHorizontal: 16,
     paddingBottom: 16,
   },
-  headerContent: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 12,
+    marginTop: 16,
+  },
+  quickActions: {
+    marginBottom: 16,
+  },
+  quickActionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickActionCard: {
+    width: '48%',
+    backgroundColor: '#ffffff',
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+  },
+  quickActionIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  quickActionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 4,
+    letterSpacing: 0.5,
+  },
+  quickActionDescription: {
+    fontSize: 13,
+    color: '#64748b',
+    lineHeight: 18,
+    letterSpacing: 0.3,
+  },
+  recentPurchases: {
+    marginBottom: 16,
+  },
+  purchasesList: {
+    gap: 8,
+  },
+  purchaseCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
+  },
+  purchaseContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 16,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingTop: Platform.OS === 'android' ? 4 : 0,
-  },
-  titleIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  titleWrapper: {
-    gap: 2,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#ffffff',
-    letterSpacing: 0.5,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    color: '#e0e7ff',
-    letterSpacing: 0.3,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-  },
-  statItem: {
+  purchaseInfo: {
     flex: 1,
+    gap: 4,
+  },
+  purchaseItem: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#1e293b',
+  },
+  purchaseDate: {
+    fontSize: 13,
+    color: '#64748b',
+  },
+  purchaseAmount: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  statIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
+  amountText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#1e40af',
+  },
+  emptyState: {
+    padding: 24,
     alignItems: 'center',
   },
-  statInfo: {
-    gap: 2,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#e0e7ff',
-    opacity: 0.8,
-  },
-  statValue: {
+  emptyText: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#ffffff',
-  },
-  statDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    marginHorizontal: 8,
-  },
-  content: {
-    flex: 1,
-    padding: 16,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  cardGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  cardWrapper: {
-    marginBottom: 12,
-  },
-  actionCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionContent: {
-    flex: 1,
-    gap: 2,
-  },
-  actionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  actionSubtitle: {
-    fontSize: 12,
-    color: '#64748b',
-  },
-  actionArrow: {
-    marginLeft: 8,
-  },
-  overviewGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  overviewCard: {
-    flex: 1,
-    minWidth: cardWidth,
-    borderRadius: 12,
-    padding: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  overviewIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  overviewContent: {
-    gap: 2,
-  },
-  overviewValue: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-  },
-  overviewLabel: {
-    fontSize: 12,
     color: '#64748b',
   },
 });
