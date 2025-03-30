@@ -22,6 +22,15 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "1a5371b8-4359-445e-9042-6a8a9213f982"
+      }
+    },
+    "owner": "x_pritam"
   }
 }
