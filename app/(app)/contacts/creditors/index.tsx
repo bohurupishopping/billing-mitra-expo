@@ -1,15 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Platform, Pressable, TextInput } from 'react-native';
-import { Text, Button, FAB, SegmentedButtons, IconButton, Portal, Modal } from 'react-native-paper';
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
+import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Platform, TextInput } from 'react-native'; // Removed Pressable
+import { Text, Button, IconButton } from 'react-native-paper'; // Removed FAB, SegmentedButtons, Portal, Modal
 import { router } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { Table, Column } from '@/components/ui/Table'; // Import the new Table component
 import { supabase } from '@/lib/supabase';
-import { Users, Building2, Calendar, User, IndianRupee, TrendingUp, Wallet, Search, Filter, Plus, ChevronRight } from 'lucide-react-native';
-import { format } from 'date-fns';
-import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
-
-const AnimatedView = Animated.createAnimatedComponent(View);
+import { Users, Building2, IndianRupee, TrendingUp, Search, Plus } from 'lucide-react-native'; // Removed Calendar, User, Wallet, Filter, ChevronRight
+// Removed format, LinearGradient, Animated imports as they are not used in the table part or header is different
+import { LinearGradient } from 'expo-linear-gradient'; // Re-added LinearGradient for header
 
 interface Creditor {
   id: string;
@@ -20,6 +18,23 @@ interface Creditor {
   outstanding_amount: number;
   created_at: string;
 }
+
+// Define columns for the reusable table
+const creditorColumns: Column<Creditor>[] = [
+  {
+    key: 'name',
+    header: 'Name',
+    flex: 1.5, // Keep Name column
+  },
+  // Removed Contact column definition
+  {
+    key: 'outstanding_amount',
+    header: 'Outstanding', // Keep Outstanding column
+    flex: 1, // Adjusted flex
+    isNumeric: true,
+    render: (item) => `₹${item.outstanding_amount.toLocaleString()}`,
+  },
+];
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -74,6 +89,30 @@ export default function CreditorsScreen() {
 
   const totalOutstanding = filteredCreditors.reduce((sum, creditor) => sum + creditor.outstanding_amount, 0);
   const averageOutstanding = filteredCreditors.length > 0 ? totalOutstanding / filteredCreditors.length : 0;
+
+  const handleRowPress = useCallback((creditor: Creditor) => {
+    router.push(`/contacts/creditors/${creditor.id}`);
+  }, []);
+
+  // Define Empty State Component for the Table
+  const EmptyCreditorsTable = () => (
+    <View style={styles.emptyState}>
+      <Users size={48} color="#64748B" strokeWidth={2.5} />
+      <Text style={styles.emptyTitle}>No Creditors Found</Text>
+      <Text style={styles.emptySubtitle}>
+        {searchQuery ? 'Try adjusting your search' : 'Start adding your creditors'}
+      </Text>
+      {!searchQuery && (
+        <Button
+          mode="contained"
+          onPress={() => router.push('/contacts/creditors/new')}
+          style={styles.emptyButton}
+        >
+          Add Creditor
+        </Button>
+      )}
+    </View>
+  );
 
   if (!selectedBusiness) {
     return (
@@ -132,7 +171,7 @@ export default function CreditorsScreen() {
               <IndianRupee size={16} color="#ffffff" strokeWidth={2.5} />
             </View>
             <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Total Outstanding</Text>
+              <Text style={styles.statLabel}>Outstanding</Text>
               <Text style={styles.statValue}>₹{totalOutstanding.toLocaleString()}</Text>
             </View>
           </View>
@@ -152,7 +191,7 @@ export default function CreditorsScreen() {
               <Users size={16} color="#ffffff" strokeWidth={2.5} />
             </View>
             <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Total Creditors</Text>
+              <Text style={styles.statLabel}>Creditors</Text>
               <Text style={styles.statValue}>{filteredCreditors.length}</Text>
             </View>
           </View>
@@ -195,71 +234,19 @@ export default function CreditorsScreen() {
           </View>
         )}
 
-        {filteredCreditors.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Users size={48} color="#64748B" strokeWidth={2.5} />
-            <Text style={styles.emptyTitle}>No Creditors Found</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery ? 'Try adjusting your search' : 'Start adding your creditors'}
-            </Text>
-            {!searchQuery && (
-              <Button 
-                mode="contained"
-                onPress={() => router.push('/contacts/creditors/new')}
-                style={styles.emptyButton}
-              >
-                Add Creditor
-              </Button>
-            )}
-          </View>
-        ) : (
-          <View style={styles.tableContainer}>
-            <View style={styles.tableHeader}>
-              <View style={[styles.tableCell, { flex: 1.5 }]}>
-                <Text style={styles.tableHeaderText}>Name</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 1 }]}>
-                <Text style={styles.tableHeaderText}>Contact</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 0.8 }]}>
-                <Text style={styles.tableHeaderText}>Outstanding</Text>
-              </View>
-            </View>
-            {filteredCreditors.map((creditor, index) => (
-              <AnimatedView
-                key={creditor.id}
-                entering={FadeInUp.duration(300).delay(index * 100)}
-                style={styles.creditorCard}
-              >
-                <Pressable 
-                  onPress={() => router.push(`/contacts/creditors/${creditor.id}`)}
-                  style={({ pressed }) => [
-                    styles.creditorContent,
-                    pressed && styles.creditorPressed
-                  ]}
-                >
-                  <View style={[styles.tableCell, { flex: 1.5 }]}>
-                    <Text style={styles.tableCellText} numberOfLines={1}>
-                      {creditor.name}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 1 }]}>
-                    <Text style={styles.tableCellText} numberOfLines={1}>
-                      {creditor.email || creditor.phone || 'No contact'}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 0.8 }]}>
-                    <Text style={styles.tableCellAmount}>
-                      ₹{creditor.outstanding_amount.toLocaleString()}
-                    </Text>
-                  </View>
-                  <ChevronRight size={16} color="#64748b" style={styles.chevron} />
-                </Pressable>
-              </AnimatedView>
-            ))}
-          </View>
-        )}
+        {/* Use the reusable Table component */}
+        <Table
+          columns={creditorColumns}
+          data={filteredCreditors}
+          getKey={(item) => item.id}
+          onRowPress={handleRowPress}
+          loading={loading}
+          EmptyStateComponent={EmptyCreditorsTable}
+          containerStyle={styles.tableComponentContainer} // Add specific container style if needed
+        />
+
       </ScrollView>
+      {/* Removed Portal and Modal as they are not used here */}
     </View>
   );
 }
@@ -392,10 +379,11 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   emptyState: {
+    // Removed duplicate alignItems and justifyContent
+    padding: 24,
+    marginTop: 32, // Reduced margin top for table empty state
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    marginTop: 48,
   },
   emptyTitle: {
     fontSize: 18,
@@ -411,54 +399,11 @@ const styles = StyleSheet.create({
   },
   emptyButton: {
     marginTop: 24,
-    backgroundColor: '#4f46e5',
+    backgroundColor: '#4f46e5', // Keep creditor-specific color
   },
-  tableContainer: {
-    gap: 8,
+  // Removed old table styles: tableContainer, tableHeader, creditorCard, creditorContent, creditorPressed, tableCell, tableHeaderText, tableCellText, tableCellAmount, chevron
+  tableComponentContainer: {
+    // Add any specific container styles for the Table component if needed
+    // Example: marginTop: 16
   },
-  tableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  creditorCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  creditorContent: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  creditorPressed: {
-    backgroundColor: '#f8fafc',
-  },
-  tableCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tableHeaderText: {
-    color: '#64748b',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  tableCellText: {
-    color: '#1e293b',
-    fontSize: 14,
-  },
-  tableCellAmount: {
-    color: '#4f46e5',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  chevron: {
-    marginLeft: 8,
-  },
-}); 
+});

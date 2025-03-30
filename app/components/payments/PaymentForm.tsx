@@ -6,7 +6,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { IndianRupee, CreditCard, User, FileText, Calendar, ChevronDown, ChevronUp } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { format } from 'date-fns';
-import { Payment, Creditor, BankAccount, Bill, createPayment, updateCreditorOutstandingAmount, updateBillStatus, createBankTransaction, fetchCreditors, fetchBankAccounts, fetchBillsForCreditor, generatePaymentNumber } from '../../lib/api/payments';
+import { Payment, Creditor, BankAccount, Bill, createPayment, updateCreditorOutstandingAmount, updateBillStatus, createBankTransaction, fetchCreditors, fetchBankAccounts, fetchBillsForCreditor, generatePaymentNumber } from '../../../lib/api/payments';
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -35,7 +35,7 @@ interface PaymentFormProps {
   onSuccess?: () => void;
 }
 
-export function PaymentForm({ onSuccess }: PaymentFormProps) {
+export default function PaymentForm({ onSuccess }: PaymentFormProps) {
   const { selectedBusiness } = useBusiness();
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState<FormData>({
@@ -638,4 +638,4 @@ const styles = StyleSheet.create({
   chevron: {
     marginLeft: 8,
   },
-}); 
+});

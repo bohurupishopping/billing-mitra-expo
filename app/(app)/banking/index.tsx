@@ -1,14 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Platform, Pressable, TextInput } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
+import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Platform, TextInput } from 'react-native'; // Removed Pressable
 import { Text, Button, IconButton } from 'react-native-paper';
-import { Stack, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router'; // Removed Stack
 import { useBusiness } from '@/contexts/BusinessContext';
-import { getBankAccounts, BankAccount } from '../../lib/api/bank-accounts';
-import { CreditCard, Plus, DollarSign, IndianRupee, Search, ChevronRight } from 'lucide-react-native';
+import { Table, Column } from '@/components/ui/Table'; // Import the new Table component
+import { getBankAccounts, BankAccount } from '../../../lib/api/bank-accounts';
+import { CreditCard, Plus, DollarSign, IndianRupee, Search } from 'lucide-react-native'; // Removed ChevronRight
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
-
-const AnimatedView = Animated.createAnimatedComponent(View);
+// Removed Animated imports
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -22,6 +21,27 @@ function formatCurrency(amount: number): string {
     maximumFractionDigits: 2,
   }).format(amount);
 }
+
+// Define columns for the reusable table
+const accountColumns: Column<BankAccount>[] = [
+  {
+    key: 'name',
+    header: 'Account',
+    flex: 1.5,
+  },
+  {
+    key: 'account_type',
+    header: 'Type',
+    flex: 1,
+  },
+  {
+    key: 'current_balance',
+    header: 'Balance',
+    flex: 1, // Adjusted flex
+    isNumeric: true,
+    render: (item) => formatCurrency(Number(item.current_balance)),
+  },
+];
 
 export default function BankingPage() {
   const router = useRouter();
@@ -69,23 +89,36 @@ export default function BankingPage() {
     account.account_type.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const totalBalance = filteredAccounts.reduce((sum: number, account: BankAccount) => 
+  const totalBalance = filteredAccounts.reduce((sum: number, account: BankAccount) =>
     sum + Number(account.current_balance), 0);
 
-  const getAccountTypeIcon = (type: string) => {
-    switch (type.toLowerCase()) {
-      case 'checking':
-        return <CreditCard size={20} color="#3B82F6" />;
-      case 'savings':
-        return <DollarSign size={20} color="#10B981" />;
-      case 'credit card':
-        return <CreditCard size={20} color="#8B5CF6" />;
-      case 'cash':
-        return <DollarSign size={20} color="#EAB308" />;
-      default:
-        return <CreditCard size={20} color="#6B7280" />;
-    }
-  };
+  const handleRowPress = useCallback((account: BankAccount) => {
+    router.push(`/banking/${account.id}` as any); // Added 'as any' to match original code
+  }, [router]);
+
+  // Define Empty State Component for the Table
+  const EmptyAccountsTable = () => (
+    <View style={styles.emptyState}>
+      <CreditCard size={48} color="#64748B" strokeWidth={2.5} />
+      <Text style={styles.emptyTitle}>No accounts found</Text>
+      <Text style={styles.emptySubtitle}>
+        {searchQuery ? 'Try adjusting your search' : 'Start adding your bank accounts'}
+      </Text>
+      {!searchQuery && (
+        <Button
+          mode="contained"
+          onPress={() => router.push('/banking/new' as any)}
+          style={styles.emptyButton}
+        >
+          Add Account
+        </Button>
+      )}
+    </View>
+  );
+
+  // Removed getAccountTypeIcon as it's not used with the Table component directly
+
+  // Removed leftover code block from getAccountTypeIcon function
 
   if (isLoading) {
     return (
@@ -195,70 +228,17 @@ export default function BankingPage() {
           </View>
         )}
 
-        {filteredAccounts.length === 0 ? (
-          <View style={styles.emptyState}>
-            <CreditCard size={48} color="#64748B" strokeWidth={2.5} />
-            <Text style={styles.emptyTitle}>No accounts found</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery ? 'Try adjusting your search' : 'Start adding your bank accounts'}
-            </Text>
-            {!searchQuery && (
-              <Button 
-                mode="contained"
-                onPress={() => router.push('/banking/new' as any)}
-                style={styles.emptyButton}
-              >
-                Add Account
-              </Button>
-            )}
-          </View>
-        ) : (
-          <View style={styles.tableContainer}>
-            <View style={styles.tableHeader}>
-              <View style={[styles.tableCell, { flex: 1.5 }]}>
-                <Text style={styles.tableHeaderText}>Account</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 1 }]}>
-                <Text style={styles.tableHeaderText}>Type</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 0.8 }]}>
-                <Text style={styles.tableHeaderText}>Balance</Text>
-              </View>
-            </View>
-            {filteredAccounts.map((account, index) => (
-              <AnimatedView
-                key={account.id}
-                entering={FadeInUp.duration(300).delay(index * 100)}
-                style={styles.accountCard}
-              >
-                <Pressable 
-                  onPress={() => router.push(`/banking/${account.id}` as any)}
-                  style={({ pressed }) => [
-                    styles.accountContent,
-                    pressed && styles.accountPressed
-                  ]}
-                >
-                  <View style={[styles.tableCell, { flex: 1.5 }]}>
-                    <Text style={styles.tableCellText} numberOfLines={1}>
-                      {account.name}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 1 }]}>
-                    <Text style={styles.tableCellText} numberOfLines={1}>
-                      {account.account_type}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 0.8 }]}>
-                    <Text style={styles.tableCellAmount}>
-                      {formatCurrency(Number(account.current_balance))}
-                    </Text>
-                  </View>
-                  <ChevronRight size={16} color="#64748b" style={styles.chevron} />
-                </Pressable>
-              </AnimatedView>
-            ))}
-          </View>
-        )}
+        {/* Use the reusable Table component */}
+        <Table
+          columns={accountColumns}
+          data={filteredAccounts}
+          getKey={(item) => item.id.toString()} // Ensure key is string
+          onRowPress={handleRowPress}
+          loading={isLoading} // Use isLoading state
+          EmptyStateComponent={EmptyAccountsTable}
+          containerStyle={styles.tableComponentContainer} // Add specific container style if needed
+        />
+
       </ScrollView>
     </View>
   );
@@ -397,10 +377,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   emptyState: {
+    // Removed duplicate alignItems and justifyContent
+    padding: 24,
+    marginTop: 32, // Reduced margin top for table empty state
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    marginTop: 48,
   },
   emptyTitle: {
     fontSize: 18,
@@ -418,52 +399,9 @@ const styles = StyleSheet.create({
     marginTop: 24,
     backgroundColor: '#4f46e5',
   },
-  tableContainer: {
-    gap: 8,
+  // Removed old table styles: tableContainer, tableHeader, accountCard, accountContent, accountPressed, tableCell, tableHeaderText, tableCellText, tableCellAmount, chevron
+  tableComponentContainer: {
+    // Add any specific container styles for the Table component if needed
+    // Example: marginTop: 16
   },
-  tableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  accountCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  accountContent: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  accountPressed: {
-    backgroundColor: '#f8fafc',
-  },
-  tableCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tableHeaderText: {
-    color: '#64748b',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  tableCellText: {
-    color: '#1e293b',
-    fontSize: 14,
-  },
-  tableCellAmount: {
-    color: '#4f46e5',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  chevron: {
-    marginLeft: 8,
-  },
-}); 
+});

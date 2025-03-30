@@ -3,8 +3,8 @@ import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Platform, Pre
 import { Text, Button, IconButton, Portal, Modal } from 'react-native-paper';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { getBankAccount, BankAccount } from '../../lib/api/bank-accounts';
-import { getTransactions, Transaction } from '../../lib/api/transactions';
+import { getBankAccount, BankAccount } from '../../../lib/api/bank-accounts';
+import { getTransactions, Transaction } from '../../../lib/api/transactions';
 import { 
   CreditCard, 
   ArrowUpRight, 

@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Pressable, Platform, TextInput } from 'react-native';
-import { Text, Card, Button, FAB, Searchbar, SegmentedButtons, IconButton, Portal, Modal } from 'react-native-paper';
+import React, { useState, useEffect, useCallback } from 'react'; // Added useCallback
+import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Platform, TextInput } from 'react-native'; // Removed Pressable
+import { Text, Button, SegmentedButtons, IconButton, Portal, Modal } from 'react-native-paper'; // Removed Card, FAB, Searchbar
 import { router } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { Table, Column } from '@/components/ui/Table'; // Import the new Table component
 import { supabase } from '@/lib/supabase';
-import { ShoppingBag, Building2, Calendar, User, DollarSign, TrendingUp, Package, Search, Filter, Plus, ChevronRight } from 'lucide-react-native';
+import { ShoppingBag, Building2, DollarSign, TrendingUp, Package, Search, Filter, Plus } from 'lucide-react-native'; // Removed Calendar, User, ChevronRight
 import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
-
-const AnimatedView = Animated.createAnimatedComponent(View);
+// Removed Animated imports
 
 type Purchase = {
   id: string;
@@ -24,6 +23,34 @@ type Purchase = {
 };
 
 type TimeFilter = 'all' | 'week' | 'month' | 'year';
+
+// Define columns for the reusable table
+const purchaseColumns: Column<Purchase>[] = [
+  {
+    key: 'purchase_date',
+    header: 'Date',
+    flex: 1,
+    render: (item) => format(new Date(item.purchase_date), 'MMM dd, yyyy'),
+  },
+  {
+    key: 'creditor_name', // Custom key for rendering
+    header: 'Creditor',
+    flex: 1.2,
+    render: (item) => item.creditors?.name || 'N/A',
+  },
+  {
+    key: 'item_name',
+    header: 'Item',
+    flex: 1.5,
+  },
+  {
+    key: 'total_price',
+    header: 'Total',
+    flex: 0.8,
+    isNumeric: true,
+    render: (item) => `₹${item.total_price.toLocaleString()}`,
+  },
+];
 
 const { width } = Dimensions.get('window');
 const cardWidth = width > 768 ? (width - 96) / 2 : width - 32;
@@ -101,6 +128,30 @@ export default function PurchasesScreen() {
   const handleTimeFilterChange = (value: string) => {
     setTimeFilter(value as TimeFilter);
   };
+
+  const handleRowPress = useCallback((purchase: Purchase) => {
+    router.push(`/purchases/${purchase.id}`);
+  }, []);
+
+  // Define Empty State Component for the Table
+  const EmptyPurchasesTable = () => (
+    <View style={styles.emptyState}>
+      <ShoppingBag size={48} color="#64748B" strokeWidth={2.5} />
+      <Text style={styles.emptyTitle}>No Purchases Found</Text>
+      <Text style={styles.emptySubtitle}>
+        {searchQuery ? 'Try adjusting your search or filter' : 'Start recording your purchases'}
+      </Text>
+      {!searchQuery && (
+        <Button
+          mode="contained"
+          onPress={() => router.push('/purchases/new')}
+          style={styles.emptyButton}
+        >
+          Record Purchase
+        </Button>
+      )}
+    </View>
+  );
 
   if (!selectedBusiness) {
     return (
@@ -226,80 +277,20 @@ export default function PurchasesScreen() {
           </View>
         )}
 
-        {filteredPurchases.length === 0 ? (
-          <View style={styles.emptyState}>
-            <ShoppingBag size={48} color="#64748B" strokeWidth={2.5} />
-            <Text style={styles.emptyTitle}>No Purchases Found</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery ? 'Try adjusting your search' : 'Start recording your purchases'}
-            </Text>
-            {!searchQuery && (
-              <Button 
-                mode="contained"
-                onPress={() => router.push('/purchases/new')}
-                style={styles.emptyButton}
-              >
-                Record Purchase
-              </Button>
-            )}
-          </View>
-        ) : (
-          <View style={styles.tableContainer}>
-            <View style={styles.tableHeader}>
-              <View style={[styles.tableCell, { flex: 1 }]}>
-                <Text style={styles.tableHeaderText}>Date</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 1.2 }]}>
-                <Text style={styles.tableHeaderText}>Creditor</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 1.5 }]}>
-                <Text style={styles.tableHeaderText}>Item</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 0.8 }]}>
-                <Text style={styles.tableHeaderText}>Total</Text>
-              </View>
-            </View>
-            {filteredPurchases.map((purchase, index) => (
-              <AnimatedView
-                key={purchase.id}
-                entering={FadeInUp.duration(300).delay(index * 100)}
-                style={styles.paymentCard}
-              >
-                <Pressable 
-                  onPress={() => router.push(`/purchases/${purchase.id}`)}
-                  style={({ pressed }) => [
-                    styles.paymentContent,
-                    pressed && styles.paymentPressed
-                  ]}
-                >
-                  <View style={[styles.tableCell, { flex: 1 }]}>
-                    <Text style={styles.tableCellText}>
-                      {format(new Date(purchase.purchase_date), 'MMM dd, yyyy')}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 1.2 }]}>
-                    <Text style={styles.tableCellText} numberOfLines={1}>
-                      {purchase.creditors?.name || 'No Creditor'}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 1.5 }]}>
-                    <Text style={styles.tableCellText} numberOfLines={1}>
-                      {purchase.item_name}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 0.8 }]}>
-                    <Text style={styles.tableCellAmount}>
-                      ₹{purchase.total_price.toLocaleString()}
-                    </Text>
-                  </View>
-                  <ChevronRight size={16} color="#64748b" style={styles.chevron} />
-                </Pressable>
-              </AnimatedView>
-            ))}
-          </View>
-        )}
+        {/* Use the reusable Table component */}
+        <Table
+          columns={purchaseColumns}
+          data={filteredPurchases}
+          getKey={(item) => item.id}
+          onRowPress={handleRowPress}
+          loading={loading}
+          EmptyStateComponent={EmptyPurchasesTable}
+          containerStyle={styles.tableComponentContainer} // Add specific container style if needed
+        />
+
       </ScrollView>
 
+      {/* Keep Portal and Modal */}
       <Portal>
         <Modal
           visible={showFilter}
@@ -454,10 +445,11 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   emptyState: {
+    // Removed duplicate alignItems and justifyContent
+    padding: 24,
+    marginTop: 32, // Reduced margin top for table empty state
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    marginTop: 48,
   },
   emptyTitle: {
     fontSize: 18,
@@ -473,58 +465,15 @@ const styles = StyleSheet.create({
   },
   emptyButton: {
     marginTop: 24,
-    backgroundColor: '#1e40af',
+    backgroundColor: '#1e40af', // Keep purchase-specific color
   },
-  tableContainer: {
-    gap: 8,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  paymentCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  paymentContent: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  paymentPressed: {
-    backgroundColor: '#f8fafc',
-  },
-  tableCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tableHeaderText: {
-    color: '#64748b',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  tableCellText: {
-    color: '#1e293b',
-    fontSize: 14,
-  },
-  tableCellAmount: {
-    color: '#1e40af',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  chevron: {
-    marginLeft: 8,
+  // Removed old table styles: tableContainer, tableHeader, paymentCard, paymentContent, paymentPressed, tableCell, tableHeaderText, tableCellText, tableCellAmount, chevron
+  tableComponentContainer: {
+    // Add any specific container styles for the Table component if needed
+    // Example: marginTop: 16
   },
   modal: {
-    margin: 20,
+    margin: 20, // Keep modal styles
   },
   modalContent: {
     backgroundColor: '#ffffff',

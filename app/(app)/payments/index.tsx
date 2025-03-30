@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Platform, Pressable, TextInput } from 'react-native';
-import { Text, Button, FAB, SegmentedButtons, IconButton, Portal, Modal } from 'react-native-paper';
+// Keep only the second import line which includes useCallback
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, RefreshControl, Dimensions, Platform, TextInput } from 'react-native';
+import { Text, Button, SegmentedButtons, IconButton, Portal, Modal } from 'react-native-paper';
 import { router } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
+import { Table, Column } from '@/components/ui/Table'; // Import the new Table component
 import { supabase } from '@/lib/supabase';
-import { CreditCard, Building2, Calendar, User, IndianRupee, TrendingUp, Wallet, Search, Filter, Plus, ChevronRight } from 'lucide-react-native';
+import { CreditCard, Building2, IndianRupee, TrendingUp, Wallet, Search, Filter, Plus } from 'lucide-react-native'; // Removed Calendar, User, ChevronRight
 import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, { FadeInUp } from 'react-native-reanimated';
-
-const AnimatedView = Animated.createAnimatedComponent(View);
+// Removed Animated imports as Table handles animation
 
 interface Creditor {
   name: string;
@@ -26,12 +26,45 @@ interface Payment {
   payment_date: string;
   amount: number;
   payment_method: string;
-  reference: string;
+  reference: string | null; // Allow null reference
   creditors: Creditor | null;
   bank_accounts: BankAccount | null;
 }
 
 type TimeFilter = 'all' | 'week' | 'month' | 'year';
+
+// Define columns for the reusable table
+const paymentColumns: Column<Payment>[] = [
+  {
+    key: 'payment_number',
+    header: 'Payment #',
+    flex: 1.2,
+  },
+  {
+    key: 'payment_date',
+    header: 'Date',
+    flex: 1,
+    render: (item) => format(new Date(item.payment_date), 'MMM dd, yyyy'),
+  },
+  {
+    key: 'creditor_name', // Use a custom key for rendering
+    header: 'To',
+    flex: 1.2,
+    render: (item) => item.creditors?.name || 'N/A',
+  },
+  {
+    key: 'payment_method',
+    header: 'Method',
+    flex: 1,
+  },
+  {
+    key: 'amount',
+    header: 'Amount',
+    flex: 0.8,
+    isNumeric: true,
+    render: (item) => `₹${item.amount.toLocaleString()}`,
+  },
+];
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -109,6 +142,31 @@ export default function PaymentsScreen() {
   const handleTimeFilterChange = (value: string) => {
     setTimeFilter(value as TimeFilter);
   };
+
+  const handleRowPress = useCallback((payment: Payment) => {
+    router.push(`/payments/${payment.id}`);
+  }, []);
+
+  // Define Empty State Component for the Table
+  const EmptyPaymentsTable = () => (
+    <View style={styles.emptyState}>
+      <CreditCard size={48} color="#64748B" strokeWidth={2.5} />
+      <Text style={styles.emptyTitle}>No Payments Found</Text>
+      <Text style={styles.emptySubtitle}>
+        {searchQuery ? 'Try adjusting your search or filter' : 'Start recording your payments'}
+      </Text>
+      {!searchQuery && (
+        <Button
+          mode="contained"
+          onPress={() => router.push('/payments/new')}
+          style={styles.emptyButton}
+        >
+          Record Payment
+        </Button>
+      )}
+    </View>
+  );
+
 
   if (!selectedBusiness) {
     return (
@@ -191,7 +249,7 @@ export default function PaymentsScreen() {
               <Wallet size={16} color="#ffffff" strokeWidth={2.5} />
             </View>
             <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Total Payments</Text>
+              <Text style={styles.statLabel}>Total</Text>
               <Text style={styles.statValue}>{filteredPayments.length}</Text>
             </View>
           </View>
@@ -234,88 +292,20 @@ export default function PaymentsScreen() {
           </View>
         )}
 
-        {filteredPayments.length === 0 ? (
-          <View style={styles.emptyState}>
-            <CreditCard size={48} color="#64748B" strokeWidth={2.5} />
-            <Text style={styles.emptyTitle}>No Payments Found</Text>
-            <Text style={styles.emptySubtitle}>
-              {searchQuery ? 'Try adjusting your search' : 'Start recording your payments'}
-            </Text>
-            {!searchQuery && (
-              <Button 
-                mode="contained"
-                onPress={() => router.push('/payments/new')}
-                style={styles.emptyButton}
-              >
-                Record Payment
-              </Button>
-            )}
-          </View>
-        ) : (
-          <View style={styles.tableContainer}>
-            <View style={styles.tableHeader}>
-              <View style={[styles.tableCell, { flex: 1.2 }]}>
-                <Text style={styles.tableHeaderText}>Payment #</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 1 }]}>
-                <Text style={styles.tableHeaderText}>Date</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 1.2 }]}>
-                <Text style={styles.tableHeaderText}>To</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 1 }]}>
-                <Text style={styles.tableHeaderText}>Method</Text>
-              </View>
-              <View style={[styles.tableCell, { flex: 0.8 }]}>
-                <Text style={styles.tableHeaderText}>Amount</Text>
-              </View>
-            </View>
-            {filteredPayments.map((payment, index) => (
-              <AnimatedView
-                key={payment.id}
-                entering={FadeInUp.duration(300).delay(index * 100)}
-                style={styles.paymentCard}
-              >
-                <Pressable 
-                  onPress={() => router.push(`/payments/${payment.id}`)}
-                  style={({ pressed }) => [
-                    styles.paymentContent,
-                    pressed && styles.paymentPressed
-                  ]}
-                >
-                  <View style={[styles.tableCell, { flex: 1.2 }]}>
-                    <Text style={styles.tableCellText}>
-                      {payment.payment_number}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 1 }]}>
-                    <Text style={styles.tableCellText}>
-                      {format(new Date(payment.payment_date), 'MMM dd, yyyy')}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 1.2 }]}>
-                    <Text style={styles.tableCellText} numberOfLines={1}>
-                      {payment.creditors?.name || 'No Creditor'}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 1 }]}>
-                    <Text style={styles.tableCellText} numberOfLines={1}>
-                      {payment.payment_method}
-                    </Text>
-                  </View>
-                  <View style={[styles.tableCell, { flex: 0.8 }]}>
-                    <Text style={styles.tableCellAmount}>
-                      ₹{payment.amount.toLocaleString()}
-                    </Text>
-                  </View>
-                  <ChevronRight size={16} color="#64748b" style={styles.chevron} />
-                </Pressable>
-              </AnimatedView>
-            ))}
-          </View>
-        )}
+        {/* Use the reusable Table component */}
+        <Table
+          columns={paymentColumns}
+          data={filteredPayments}
+          getKey={(item) => item.id}
+          onRowPress={handleRowPress}
+          loading={loading}
+          EmptyStateComponent={EmptyPaymentsTable}
+          containerStyle={styles.tableComponentContainer} // Add specific container style if needed
+        />
+
       </ScrollView>
 
+      {/* Keep Portal and Modal */}
       <Portal>
         <Modal
           visible={showFilter}
@@ -470,10 +460,11 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   emptyState: {
+    // Removed duplicate alignItems and justifyContent
+    padding: 24,
+    marginTop: 32, // Reduced margin top for table empty state
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 24,
-    marginTop: 48,
   },
   emptyTitle: {
     fontSize: 18,
@@ -491,56 +482,13 @@ const styles = StyleSheet.create({
     marginTop: 24,
     backgroundColor: '#4f46e5',
   },
-  tableContainer: {
-    gap: 8,
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 8,
-    marginBottom: 4,
-  },
-  paymentCard: {
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#f1f5f9',
-  },
-  paymentContent: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-  },
-  paymentPressed: {
-    backgroundColor: '#f8fafc',
-  },
-  tableCell: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  tableHeaderText: {
-    color: '#64748b',
-    fontWeight: '600',
-    fontSize: 13,
-  },
-  tableCellText: {
-    color: '#1e293b',
-    fontSize: 14,
-  },
-  tableCellAmount: {
-    color: '#4f46e5',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  chevron: {
-    marginLeft: 8,
+  // Removed old table styles: tableContainer, tableHeader, paymentCard, paymentContent, paymentPressed, tableCell, tableHeaderText, tableCellText, tableCellAmount, chevron
+  tableComponentContainer: {
+    // Add any specific container styles for the Table component if needed
+    // Example: marginTop: 16
   },
   modal: {
-    margin: 20,
+    margin: 20, // Keep modal styles
   },
   modalContent: {
     backgroundColor: '#ffffff',

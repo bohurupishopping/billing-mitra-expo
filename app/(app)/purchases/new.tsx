@@ -6,7 +6,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { IndianRupee, ArrowLeft, Save, ChevronDown } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { fetchCreditors, generatePurchaseNumber, createPurchase, updateCreditorOutstandingAmount, Creditor } from '../../lib/api/purchases';
+import { fetchCreditors, generatePurchaseNumber, createPurchase, updateCreditorOutstandingAmount, Creditor } from '../../../lib/api/purchases';
 
 type FormData = {
   purchaseNumber: string;

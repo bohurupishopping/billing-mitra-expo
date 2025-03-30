@@ -13,7 +13,7 @@ import {
   updateCreditorOutstandingAmount, 
   Creditor,
   Purchase 
-} from '../../../lib/api/purchases';
+} from '../../../../lib/api/purchases';
 
 type FormData = {
   purchaseNumber: string;
