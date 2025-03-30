@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Platform, ScrollView, Dimensions } from 'react-native';
-import { Text, TextInput, Button, HelperText, Checkbox, Portal, Modal, List, ActivityIndicator, Surface, Menu } from 'react-native-paper';
+import { View, StyleSheet, Platform, ScrollView, Dimensions, LayoutAnimation, UIManager } from 'react-native';
+import { Text, TextInput, Button, HelperText, Checkbox, ActivityIndicator, Surface } from 'react-native-paper';
 import { router } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { IndianRupee, CreditCard, User, FileText, Calendar, ChevronDown, ChevronUp } from 'lucide-react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { format } from 'date-fns';
 import { Payment, Creditor, BankAccount, Bill, createPayment, updateCreditorOutstandingAmount, updateBillStatus, createBankTransaction, fetchCreditors, fetchBankAccounts, fetchBillsForCreditor, generatePaymentNumber } from '../../../lib/api/payments';
+import SearchableSelectModal from '../ui/SearchableSelectModal'; // Import the new modal
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -57,9 +63,9 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
   const [fetchingAccounts, setFetchingAccounts] = useState(true);
   const [fetchingBills, setFetchingBills] = useState(true);
   const [showAdditionalFields, setShowAdditionalFields] = useState(false);
-  const [showBankAccountModal, setShowBankAccountModal] = useState(false);
-  const [showCreditorModal, setShowCreditorModal] = useState(false);
-  const [showBillModal, setShowBillModal] = useState(false);
+  const [isBankAccountModalVisible, setIsBankAccountModalVisible] = useState(false);
+  const [isCreditorModalVisible, setIsCreditorModalVisible] = useState(false);
+  const [isBillModalVisible, setIsBillModalVisible] = useState(false);
 
   useEffect(() => {
     if (selectedBusiness) {
@@ -74,18 +80,6 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
       setBills([]);
     }
   }, [selectedBusiness, formData.creditorId]);
-
-  useEffect(() => {
-    if (formData.billId && bills.length > 0) {
-      const selectedBill = bills.find(bill => bill.id === formData.billId);
-      if (selectedBill) {
-        setFormData(prev => ({
-          ...prev,
-          amount: selectedBill.total_amount.toString()
-        }));
-      }
-    }
-  }, [formData.billId, bills]);
 
   const loadInitialData = async () => {
     if (!selectedBusiness) return;
@@ -146,6 +140,26 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleToggleAdditionalFields = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowAdditionalFields(!showAdditionalFields);
+  };
+
+  const handleCreateBankTransactionToggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setFormData(prev => ({ ...prev, createBankTransaction: !prev.createBankTransaction }));
+  };
+
+  const handleSelectBill = (bill: Bill | null) => {
+    setFormData(prev => ({
+      ...prev,
+      billId: bill?.id || '',
+      // Optionally auto-fill amount if a bill is selected and amount is empty
+      amount: bill && !prev.amount ? bill.total_amount.toString() : prev.amount,
+    }));
+    setIsBillModalVisible(false);
   };
 
   const handleSubmit = async () => {
@@ -212,9 +226,9 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
 
       onSuccess?.();
       router.back();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating payment:', error);
-      setErrors(prev => ({ ...prev, submit: 'Failed to create payment' }));
+      setErrors(prev => ({ ...prev, submit: error.message || 'Failed to create payment' }));
     } finally {
       setLoading(false);
     }
@@ -265,6 +279,8 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
           </View>
         </View>
       </Surface>
+ {/* End of Stats Container
+ */}
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={[styles.form, isTablet && styles.formTablet]}>
@@ -316,53 +332,32 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
               </Animated.View>
 
               <Animated.View entering={FadeInDown.duration(300).delay(400)}>
-                <Menu
-                  visible={showCreditorModal}
-                  onDismiss={() => setShowCreditorModal(false)}
-                  anchor={
-                    <Button
-                      mode="outlined"
-                      onPress={() => setShowCreditorModal(true)}
-                      style={styles.input}
-                      contentStyle={styles.creditorButton}
-                      disabled={fetchingCreditors}
-                    >
-                      {creditors.find(c => c.id === formData.creditorId)?.name || 'Select Creditor (Optional)'}
-                      <ChevronDown size={20} style={styles.chevron} />
-                    </Button>
-                  }
+                <Button
+                  mode="outlined"
+                  onPress={() => setIsCreditorModalVisible(true)}
+                  style={styles.selectButton}
+                  contentStyle={styles.selectButtonContent}
+                  labelStyle={styles.selectButtonLabel}
+                  disabled={fetchingCreditors}
+                  icon={() => <User size={18} color="#64748b" />}
                 >
-                  <Menu.Item
-                    onPress={() => {
-                      setFormData(prev => ({ ...prev, creditorId: '' }));
-                      setShowCreditorModal(false);
-                    }}
-                    title="No Creditor"
-                  />
-                  {creditors.map((creditor) => (
-                    <Menu.Item
-                      key={creditor.id}
-                      onPress={() => {
-                        setFormData(prev => ({ ...prev, creditorId: creditor.id }));
-                        setShowCreditorModal(false);
-                      }}
-                      title={`${creditor.name} (₹${creditor.outstanding_amount.toLocaleString()})`}
-                    />
-                  ))}
-                </Menu>
+                  {creditors.find(c => c.id === formData.creditorId)?.name || 'Select Creditor (Optional)'}
+                </Button>
               </Animated.View>
 
               {formData.creditorId && bills.length > 0 && (
                 <Animated.View entering={FadeInDown.duration(300).delay(450)}>
-                  <TextInput
+                  <Button
                     mode="outlined"
-                    label="For Bill"
-                    value={bills.find(b => b.id === formData.billId)?.bill_number || ''}
-                    onPressIn={() => setShowBillModal(true)}
-                    right={<TextInput.Icon icon={() => <ChevronDown size={20} color="#64748b" />} />}
-                    style={styles.input}
+                    onPress={() => setIsBillModalVisible(true)}
+                    style={styles.selectButton}
+                    contentStyle={styles.selectButtonContent}
+                    labelStyle={styles.selectButtonLabel}
                     disabled={fetchingBills}
-                  />
+                    icon={() => <FileText size={18} color="#64748b" />}
+                  >
+                    {bills.find(b => b.id === formData.billId)?.bill_number || 'Select Bill (Optional)'}
+                  </Button>
                 </Animated.View>
               )}
             </View>
@@ -380,43 +375,30 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
               </Animated.View>
 
               <Animated.View entering={FadeInDown.duration(300).delay(550)}>
-                <Checkbox.Item
-                  label="Create bank transaction record"
-                  status={formData.createBankTransaction ? 'checked' : 'unchecked'}
-                  onPress={() => setFormData(prev => ({ ...prev, createBankTransaction: !prev.createBankTransaction }))}
-                  style={styles.checkbox}
-                />
+                <View style={styles.checkboxContainer}>
+                  <Checkbox
+                    status={formData.createBankTransaction ? 'checked' : 'unchecked'}
+                    onPress={handleCreateBankTransactionToggle} // Use handler for animation
+                  />
+                  <Text style={styles.checkboxLabel} onPress={handleCreateBankTransactionToggle}>
+                    Create bank transaction record
+                  </Text>
+                </View>
               </Animated.View>
 
               {formData.createBankTransaction && (
                 <Animated.View entering={FadeInDown.duration(300).delay(600)}>
-                  <Menu
-                    visible={showBankAccountModal}
-                    onDismiss={() => setShowBankAccountModal(false)}
-                    anchor={
-                      <Button
-                        mode="outlined"
-                        onPress={() => setShowBankAccountModal(true)}
-                        style={styles.input}
-                        contentStyle={styles.creditorButton}
-                        disabled={fetchingAccounts}
-                      >
-                        {bankAccounts.find(acc => acc.id === formData.bankAccountId)?.name || 'Select Bank Account'}
-                        <ChevronDown size={20} style={styles.chevron} />
-                      </Button>
-                    }
+                  <Button
+                    mode="outlined"
+                    onPress={() => setIsBankAccountModalVisible(true)}
+                style={[styles.selectButton, !!errors.bankAccountId && styles.errorBorder]} // Add error border
+                        contentStyle={styles.selectButtonContent}
+                    labelStyle={styles.selectButtonLabel}
+                    disabled={fetchingAccounts}
+                    icon={() => <CreditCard size={18} color="#64748b" />}
                   >
-                    {bankAccounts.map((account) => (
-                      <Menu.Item
-                        key={account.id}
-                        onPress={() => {
-                          setFormData(prev => ({ ...prev, bankAccountId: account.id }));
-                          setShowBankAccountModal(false);
-                        }}
-                        title={`${account.name} (${account.account_type}) - ₹${account.current_balance.toLocaleString()}`}
-                      />
-                    ))}
-                  </Menu>
+                    {bankAccounts.find(acc => acc.id === formData.bankAccountId)?.name || 'Select Bank Account'}
+                  </Button>
                   {errors.bankAccountId && (
                     <HelperText type="error">{errors.bankAccountId}</HelperText>
                   )}
@@ -425,7 +407,7 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
 
               <Button
                 mode="text"
-                onPress={() => setShowAdditionalFields(!showAdditionalFields)}
+                onPress={handleToggleAdditionalFields} // Use handler for animation
                 icon={() => showAdditionalFields ? <ChevronUp size={20} color="#64748b" /> : <ChevronDown size={20} color="#64748b" />}
                 style={styles.toggleButton}
               >
@@ -484,29 +466,58 @@ export default function PaymentForm({ onSuccess }: PaymentFormProps) {
           </View>
         </View>
       </ScrollView>
+ {/* End of ScrollView
+ */}
 
-      <Portal>
-        <Modal
-          visible={showBillModal}
-          onDismiss={() => setShowBillModal(false)}
-          contentContainerStyle={styles.modal}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Bill</Text>
-            {bills.map(bill => (
-              <List.Item
-                key={bill.id}
-                title={bill.bill_number}
-                description={`Amount: ₹${bill.total_amount.toLocaleString()}`}
-                onPress={() => {
-                  setFormData(prev => ({ ...prev, billId: bill.id }));
-                  setShowBillModal(false);
-                }}
-              />
-            ))}
-          </View>
-        </Modal>
-      </Portal>
+      {/* Creditor Selection Modal */}
+      <SearchableSelectModal          visible={isCreditorModalVisible}
+        onDismiss={() => setIsCreditorModalVisible(false)}
+        items={creditors}
+        onSelect={(creditor) => {
+          setFormData(prev => ({ ...prev, creditorId: creditor?.id || '', billId: '' })); // Reset bill if creditor changes
+          setIsCreditorModalVisible(false);
+        }}
+        title="Select Creditor"
+        labelKey="name"
+        descriptionKey={(item: Creditor) => `Outstanding: ₹${item.outstanding_amount.toLocaleString()}`}
+        searchKeys={['name']} // Removed 'contact_person' as it might not exist directly
+        loading={fetchingCreditors}
+        allowClear={true}
+        clearLabel="No Creditor"
+      />
+
+      {/* Bank Account Selection Modal */}
+      <SearchableSelectModal
+        visible={isBankAccountModalVisible}
+        onDismiss={() => setIsBankAccountModalVisible(false)}
+        items={bankAccounts}
+        onSelect={(account) => {
+          setFormData(prev => ({ ...prev, bankAccountId: account?.id || '' }));
+          setIsBankAccountModalVisible(false);
+        }}
+        title="Select Bank Account"
+        labelKey="name"
+        descriptionKey={(item: BankAccount) => `${item.account_type} - Balance: ₹${item.current_balance.toLocaleString()}`}
+        searchKeys={['name', 'account_number']} // Removed 'bank_name' as it might not exist directly
+        loading={fetchingAccounts}
+      />
+
+      {/* Bill Selection Modal */}
+      <SearchableSelectModal
+        visible={isBillModalVisible}
+        onDismiss={() => setIsBillModalVisible(false)}
+        items={bills}
+        onSelect={handleSelectBill} // Use dedicated handler
+        title="Select Bill"
+        labelKey="bill_number"
+        descriptionKey={(item: Bill) => `Amount: ₹${item.total_amount.toLocaleString()} | Due: ${format(new Date(item.due_date), 'MMM dd, yyyy')}`}
+        searchKeys={['bill_number']}
+        loading={fetchingBills}
+        allowClear={true}
+        clearLabel="No Specific Bill"
+      />
+ {/* Ensured correct closing tag placement */}
+
     </View>
   );
 }
@@ -587,10 +598,23 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   checkbox: {
+    // Removed direct style, using container now
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
+    // backgroundColor: '#ffffff', // Optional: if you want a white background
+    // paddingVertical: 4, // Optional: add some padding
+  },
+  checkboxLabel: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#334155', // Slightly darker text
   },
   toggleButton: {
     marginVertical: 8,
+    alignSelf: 'flex-start', // Align button to the left
   },
   errorText: {
     color: '#ef4444',
@@ -605,21 +629,6 @@ const styles = StyleSheet.create({
   button: {
     minWidth: 120,
   },
-  modal: {
-    backgroundColor: '#ffffff',
-    margin: 20,
-    borderRadius: 12,
-    padding: 16,
-  },
-  modalContent: {
-    gap: 8,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -631,11 +640,26 @@ const styles = StyleSheet.create({
     color: '#64748b',
     textAlign: 'center',
   },
-  creditorButton: {
+  selectButton: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1', // Default border color
+    height: 56, // Match TextInput height
+    justifyContent: 'center',
+  },
+  selectButtonContent: {
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 14, // Match TextInput padding
+    height: '100%',
   },
-  chevron: {
-    marginLeft: 8,
+  selectButtonLabel: {
+    fontSize: 16, // Match TextInput font size
+    color: '#1e293b', // Match TextInput text color
+    textAlign: 'left',
+    flex: 1, // Ensure label takes available space
+  },
+  errorBorder: {
+    borderColor: '#ef4444', // Error border color from react-native-paper
   },
 });
+

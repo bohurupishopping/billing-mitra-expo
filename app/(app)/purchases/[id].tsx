@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable } from 'react-native';
-import { Text, Button, IconButton, Portal, Dialog } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, RefreshControl, Pressable, Platform } from 'react-native';
+import { Text, Button, IconButton, Portal, Dialog, ActivityIndicator } from 'react-native-paper'; // Added ActivityIndicator
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { Calendar, ShoppingBag, User, Trash2, CircleAlert as AlertCircle, Pencil, IndianRupee, ArrowLeft } from 'lucide-react-native';
-import Animated, { FadeIn } from 'react-native-reanimated';
+import Animated, { FadeInUp } from 'react-native-reanimated'; // Changed to FadeInUp
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Import safe area hook
 
 type Purchase = {
   id: string;
@@ -28,6 +29,7 @@ export default function PurchaseDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { selectedBusiness } = useBusiness();
+  const insets = useSafeAreaInsets(); // Get safe area insets
   
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [loading, setLoading] = useState(true);
@@ -92,21 +94,20 @@ export default function PurchaseDetailScreen() {
         colors={['#1e40af', '#1e3a8a']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: insets.top + 10 }]} // Use safe area inset
       >
         <View style={styles.headerContent}>
-          <Button
-            mode="text"
+          <Pressable
             onPress={() => router.back()}
-            icon={() => <ArrowLeft size={20} color="#ffffff" />}
-            textColor="#ffffff"
             style={styles.backButton}
+            hitSlop={10}
+            aria-label="Go back"
           >
-            Back
-          </Button>
+            <ArrowLeft size={24} color="#ffffff" />
+          </Pressable>
           <View style={styles.headerText}>
             <Text variant="titleLarge" style={styles.purchaseNumber}>
-              Purchase #{purchase?.purchase_number}
+              Purchase #{purchase?.purchase_number || '...'}
             </Text>
             <Text variant="titleMedium" style={styles.totalAmount}>
               ₹{purchase?.total_price.toLocaleString()}
@@ -115,11 +116,15 @@ export default function PurchaseDetailScreen() {
           <View style={styles.headerActions}>
             <IconButton
               icon={() => <Pencil size={20} color="#ffffff" />}
+              style={styles.headerActionButton}
               onPress={() => router.push(`/purchases/edit/${id}`)}
+              disabled={!purchase} // Disable if no purchase data
             />
             <IconButton
               icon={() => <Trash2 size={20} color="#ffffff" />}
+              style={styles.headerActionButton}
               onPress={() => setShowDeleteDialog(true)}
+              disabled={!purchase} // Disable if no purchase data
             />
           </View>
         </View>
@@ -138,11 +143,12 @@ export default function PurchaseDetailScreen() {
         )}
 
         {loading ? (
-          <View style={styles.loadingContainer}>
+          <View style={styles.centeredContainer}>
+            <ActivityIndicator animating={true} size="large" />
             <Text>Loading purchase details...</Text>
           </View>
         ) : !purchase ? (
-          <View style={styles.emptyContainer}>
+          <View style={styles.centeredContainer}>
             <AlertCircle size={48} color="#ef4444" />
             <Text style={styles.emptyText}>Purchase not found</Text>
             <Button mode="contained" onPress={() => router.back()}>
@@ -151,7 +157,7 @@ export default function PurchaseDetailScreen() {
           </View>
         ) : (
           <Animated.View 
-            entering={FadeIn.duration(300)}
+            entering={FadeInUp.duration(400).delay(100)} // Use FadeInUp
             style={styles.detailsContainer}
           >
             <View style={styles.detailsCard}>
@@ -218,7 +224,7 @@ export default function PurchaseDetailScreen() {
 
               {purchase.description && (
                 <View style={styles.descriptionContainer}>
-                  <Text style={styles.descriptionLabel}>Description</Text>
+                  <Text style={styles.descriptionLabel}>Notes / Description</Text>
                   <Text style={styles.descriptionText}>
                     {purchase.description}
                   </Text>
@@ -253,16 +259,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
-    paddingTop: 48,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 20, // Increased bottom padding
+    borderBottomLeftRadius: 16, // Add subtle rounding
+    borderBottomRightRadius: 16,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   backButton: {
-    marginRight: 16,
+    marginRight: 12,
+    padding: 8, // Add padding for easier touch
+    borderRadius: 16, // Make it round
   },
   headerText: {
     flex: 1,
@@ -277,19 +286,16 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   headerActions: {
+    // Styles for header action buttons
     flexDirection: 'row',
-    gap: 4,
+  },
+  headerActionButton: {
+    margin: -8, // Reduce default margin to bring icons closer
   },
   content: {
     flex: 1,
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  emptyContainer: {
+  centeredContainer: { // Renamed for clarity and reuse
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -306,8 +312,6 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#fef2f2',
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#fee2e2',
   },
   errorText: {
     color: '#ef4444',
@@ -320,8 +324,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
+    elevation: 1, // Add subtle shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   detailRow: {
     flexDirection: 'row',
@@ -366,10 +373,11 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#f1f5f9',
   },
-  descriptionLabel: {
+  descriptionLabel: { // Changed label style
     color: '#64748b',
     fontSize: 14,
     marginBottom: 8,
+    fontWeight: '500',
   },
   descriptionText: {
     color: '#1e293b',

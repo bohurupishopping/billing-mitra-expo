@@ -1,14 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Platform, Dimensions } from 'react-native';
-import { Text, TextInput, Button, HelperText, Checkbox, Portal, Modal, List, Menu } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Platform, Dimensions, Pressable, LayoutAnimation, UIManager } from 'react-native';
+import { Text, TextInput, Button, HelperText, Checkbox, ActivityIndicator } from 'react-native-paper';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { IndianRupee, CreditCard, User, FileText, Calendar, ChevronDown, ChevronUp, ArrowLeft, Save } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
 import { format } from 'date-fns';
-import { Payment, Creditor, BankAccount, Bill, fetchCreditors, fetchBankAccounts, fetchBillsForCreditor } from '../../lib/api/payments';
+import { Payment, Creditor, BankAccount, Bill, fetchCreditors, fetchBankAccounts, fetchBillsForCreditor } from '../../../../lib/api/payments'; // Corrected path again
 import { supabase } from '@/lib/supabase';
+import SearchableSelectModal from '../../../components/ui/SearchableSelectModal'; // Corrected path
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Enable LayoutAnimation on Android
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width } = Dimensions.get('window');
 const isTablet = width > 768;
@@ -37,6 +44,7 @@ export default function EditPaymentScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { selectedBusiness } = useBusiness();
+  const insets = useSafeAreaInsets(); // Get safe area insets
   
   const [formData, setFormData] = useState<FormData>({
     paymentNumber: '',
@@ -61,9 +69,9 @@ export default function EditPaymentScreen() {
   const [fetchingAccounts, setFetchingAccounts] = useState(true);
   const [fetchingBills, setFetchingBills] = useState(true);
   const [showAdditionalFields, setShowAdditionalFields] = useState(false);
-  const [showBankAccountModal, setShowBankAccountModal] = useState(false);
-  const [showCreditorModal, setShowCreditorModal] = useState(false);
-  const [showBillModal, setShowBillModal] = useState(false);
+  const [isBankAccountModalVisible, setIsBankAccountModalVisible] = useState(false);
+  const [isCreditorModalVisible, setIsCreditorModalVisible] = useState(false);
+  const [isBillModalVisible, setIsBillModalVisible] = useState(false);
 
   useEffect(() => {
     if (selectedBusiness && id) {
@@ -207,6 +215,25 @@ export default function EditPaymentScreen() {
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
+  };
+
+  const handleToggleAdditionalFields = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setShowAdditionalFields(!showAdditionalFields);
+  };
+
+  const handleCreateBankTransactionToggle = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setFormData(prev => ({ ...prev, createBankTransaction: !prev.createBankTransaction }));
+  };
+
+  const handleSelectBill = (bill: Bill | null) => {
+    setFormData(prev => ({
+      ...prev,
+      billId: bill?.id || '',
+      // Don't auto-fill amount on edit screen unless explicitly needed
+    }));
+    setIsBillModalVisible(false);
   };
 
   const handleSubmit = async () => {
@@ -356,7 +383,9 @@ export default function EditPaymentScreen() {
   if (fetchLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
+        {/* Optional: Add a proper loading skeleton here */}
+        <View style={styles.centered}>
+          <ActivityIndicator animating={true} size="large" />
           <Text>Loading payment details...</Text>
         </View>
       </View>
@@ -369,18 +398,17 @@ export default function EditPaymentScreen() {
         colors={['#4f46e5', '#4338ca']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: insets.top + 10 }]} // Use safe area top inset + padding
       >
         <View style={styles.headerContent}>
-          <Button
-            mode="text"
+          <Pressable
             onPress={() => router.back()}
-            icon={() => <ArrowLeft size={20} color="#ffffff" />}
-            textColor="#ffffff"
             style={styles.backButton}
+            hitSlop={10}
+            aria-label="Go back"
           >
-            Back
-          </Button>
+            <ArrowLeft size={24} color="#ffffff" />
+          </Pressable>
           <View style={styles.headerText}>
             <Text style={styles.headerTitle}>Edit Payment</Text>
             <Text style={styles.headerSubtitle}>
@@ -425,7 +453,7 @@ export default function EditPaymentScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={[styles.form, isTablet && styles.formTablet]}>
+        <Animated.View style={[styles.form, isTablet && styles.formTablet]} entering={FadeInUp.duration(400).delay(100)}>
           <View style={[styles.formGrid, isTablet && styles.formGridTablet]}>
             {/* Left Column */}
             <View style={[styles.formColumn, isTablet && styles.formColumnTablet]}>
@@ -474,53 +502,32 @@ export default function EditPaymentScreen() {
               </Animated.View>
 
               <Animated.View entering={FadeInDown.duration(300).delay(400)}>
-                <Menu
-                  visible={showCreditorModal}
-                  onDismiss={() => setShowCreditorModal(false)}
-                  anchor={
-                    <Button
-                      mode="outlined"
-                      onPress={() => setShowCreditorModal(true)}
-                      style={styles.input}
-                      contentStyle={styles.creditorButton}
-                      disabled={fetchingCreditors}
-                    >
-                      {creditors.find(c => c.id === formData.creditorId)?.name || 'Select Creditor (Optional)'}
-                      <ChevronDown size={20} style={styles.chevron} />
-                    </Button>
-                  }
+                <Button
+                  mode="outlined"
+                  onPress={() => setIsCreditorModalVisible(true)}
+                  style={styles.selectButton}
+                  contentStyle={styles.selectButtonContent}
+                  labelStyle={styles.selectButtonLabel}
+                  disabled={fetchingCreditors}
+                  icon={() => <User size={18} color="#64748b" />}
                 >
-                  <Menu.Item
-                    onPress={() => {
-                      setFormData(prev => ({ ...prev, creditorId: '' }));
-                      setShowCreditorModal(false);
-                    }}
-                    title="No Creditor"
-                  />
-                  {creditors.map((creditor) => (
-                    <Menu.Item
-                      key={creditor.id}
-                      onPress={() => {
-                        setFormData(prev => ({ ...prev, creditorId: creditor.id }));
-                        setShowCreditorModal(false);
-                      }}
-                      title={`${creditor.name} (₹${creditor.outstanding_amount.toLocaleString()})`}
-                    />
-                  ))}
-                </Menu>
+                  {creditors.find(c => c.id === formData.creditorId)?.name || 'Select Creditor (Optional)'}
+                </Button>
               </Animated.View>
 
               {formData.creditorId && bills.length > 0 && (
                 <Animated.View entering={FadeInDown.duration(300).delay(450)}>
-                  <TextInput
+                  <Button
                     mode="outlined"
-                    label="For Bill"
-                    value={bills.find(b => b.id === formData.billId)?.bill_number || ''}
-                    onPressIn={() => setShowBillModal(true)}
-                    right={<TextInput.Icon icon={() => <ChevronDown size={20} color="#64748b" />} />}
-                    style={styles.input}
+                    onPress={() => setIsBillModalVisible(true)}
+                    style={styles.selectButton}
+                    contentStyle={styles.selectButtonContent}
+                    labelStyle={styles.selectButtonLabel}
                     disabled={fetchingBills}
-                  />
+                    icon={() => <FileText size={18} color="#64748b" />}
+                  >
+                    {bills.find(b => b.id === formData.billId)?.bill_number || 'Select Bill (Optional)'}
+                  </Button>
                 </Animated.View>
               )}
             </View>
@@ -538,43 +545,30 @@ export default function EditPaymentScreen() {
               </Animated.View>
 
               <Animated.View entering={FadeInDown.duration(300).delay(550)}>
-                <Checkbox.Item
-                  label="Create bank transaction record"
-                  status={formData.createBankTransaction ? 'checked' : 'unchecked'}
-                  onPress={() => setFormData(prev => ({ ...prev, createBankTransaction: !prev.createBankTransaction }))}
-                  style={styles.checkbox}
-                />
+                <View style={styles.checkboxContainer}>
+                  <Checkbox
+                    status={formData.createBankTransaction ? 'checked' : 'unchecked'}
+                    onPress={handleCreateBankTransactionToggle} // Use handler for animation
+                  />
+                  <Text style={styles.checkboxLabel} onPress={handleCreateBankTransactionToggle}>
+                    Create/Update bank transaction record
+                  </Text>
+                </View>
               </Animated.View>
 
               {formData.createBankTransaction && (
                 <Animated.View entering={FadeInDown.duration(300).delay(600)}>
-                  <Menu
-                    visible={showBankAccountModal}
-                    onDismiss={() => setShowBankAccountModal(false)}
-                    anchor={
-                      <Button
-                        mode="outlined"
-                        onPress={() => setShowBankAccountModal(true)}
-                        style={styles.input}
-                        contentStyle={styles.creditorButton}
-                        disabled={fetchingAccounts}
-                      >
-                        {bankAccounts.find(acc => acc.id === formData.bankAccountId)?.name || 'Select Bank Account'}
-                        <ChevronDown size={20} style={styles.chevron} />
-                      </Button>
-                    }
+                  <Button
+                    mode="outlined"
+                    onPress={() => setIsBankAccountModalVisible(true)}
+                    style={[styles.selectButton, !!errors.bankAccountId && styles.errorBorder]} // Add error border
+                    contentStyle={styles.selectButtonContent}
+                    labelStyle={styles.selectButtonLabel}
+                    disabled={fetchingAccounts}
+                    icon={() => <CreditCard size={18} color="#64748b" />}
                   >
-                    {bankAccounts.map((account) => (
-                      <Menu.Item
-                        key={account.id}
-                        onPress={() => {
-                          setFormData(prev => ({ ...prev, bankAccountId: account.id }));
-                          setShowBankAccountModal(false);
-                        }}
-                        title={`${account.name} (${account.account_type}) - ₹${account.current_balance.toLocaleString()}`}
-                      />
-                    ))}
-                  </Menu>
+                    {bankAccounts.find(acc => acc.id === formData.bankAccountId)?.name || 'Select Bank Account'}
+                  </Button>
                   {errors.bankAccountId && (
                     <HelperText type="error">{errors.bankAccountId}</HelperText>
                   )}
@@ -583,7 +577,7 @@ export default function EditPaymentScreen() {
 
               <Button
                 mode="text"
-                onPress={() => setShowAdditionalFields(!showAdditionalFields)}
+                onPress={handleToggleAdditionalFields} // Use handler for animation
                 icon={() => showAdditionalFields ? <ChevronUp size={20} color="#64748b" /> : <ChevronDown size={20} color="#64748b" />}
                 style={styles.toggleButton}
               >
@@ -641,31 +635,58 @@ export default function EditPaymentScreen() {
               Save Changes
             </Button>
           </View>
-        </View>
+        </Animated.View> {/* End of Animated.View for form */}
       </ScrollView>
 
-      <Portal>
-        <Modal
-          visible={showBillModal}
-          onDismiss={() => setShowBillModal(false)}
-          contentContainerStyle={styles.modal}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Bill</Text>
-            {bills.map(bill => (
-              <List.Item
-                key={bill.id}
-                title={bill.bill_number}
-                description={`Amount: ₹${bill.total_amount.toLocaleString()}`}
-                onPress={() => {
-                  setFormData(prev => ({ ...prev, billId: bill.id }));
-                  setShowBillModal(false);
-                }}
-              />
-            ))}
-          </View>
-        </Modal>
-      </Portal>
+      {/* Creditor Selection Modal */}
+      <SearchableSelectModal
+        visible={isCreditorModalVisible}
+        onDismiss={() => setIsCreditorModalVisible(false)}
+        items={creditors}
+        onSelect={(creditor: Creditor | null) => {
+          setFormData(prev => ({ ...prev, creditorId: creditor?.id || '', billId: '' })); // Reset bill if creditor changes
+          setIsCreditorModalVisible(false);
+        }}
+        title="Select Creditor"
+        labelKey="name"
+        descriptionKey={(item: Creditor) => `Outstanding: ₹${item.outstanding_amount.toLocaleString()}`}
+        searchKeys={['name']}
+        loading={fetchingCreditors}
+        allowClear={true}
+        clearLabel="No Creditor"
+      />
+
+      {/* Bank Account Selection Modal */}
+      <SearchableSelectModal
+        visible={isBankAccountModalVisible}
+        onDismiss={() => setIsBankAccountModalVisible(false)}
+        items={bankAccounts}
+        onSelect={(account: BankAccount | null) => {
+          setFormData(prev => ({ ...prev, bankAccountId: account?.id || '' }));
+          setIsBankAccountModalVisible(false);
+        }}
+        title="Select Bank Account"
+        labelKey="name"
+        descriptionKey={(item: BankAccount) => `${item.account_type} - Balance: ₹${item.current_balance.toLocaleString()}`}
+        searchKeys={['name', 'account_number']}
+        loading={fetchingAccounts}
+      />
+
+      {/* Bill Selection Modal */}
+      <SearchableSelectModal
+        visible={isBillModalVisible}
+        onDismiss={() => setIsBillModalVisible(false)}
+        items={bills}
+        onSelect={handleSelectBill} // Use dedicated handler
+        title="Select Bill"
+        labelKey="bill_number"
+        descriptionKey={(item: Bill) => `Amount: ₹${item.total_amount.toLocaleString()} | Due: ${format(new Date(item.due_date), 'MMM dd, yyyy')}`}
+        searchKeys={['bill_number']}
+        loading={fetchingBills}
+        allowClear={true}
+        clearLabel="No Specific Bill"
+      />
+
     </View>
   );
 }
@@ -675,23 +696,27 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  loadingContainer: {
+  centered: { // Renamed loadingContainer for clarity
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : Platform.OS === 'android' ? 48 : 20,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 20, // Increased bottom padding
+    borderBottomLeftRadius: 16, // Add subtle rounding
+    borderBottomRightRadius: 16,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    // Removed marginBottom, handled by header paddingBottom
   },
   backButton: {
-    marginRight: 16,
+    marginRight: 12,
+    padding: 8, // Add padding for easier touch
+    borderRadius: 16, // Make it round
   },
   headerText: {
     flex: 1,
@@ -709,13 +734,14 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   statsContainer: {
+    // Styles moved from below form to inside header gradient
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: 12,
     padding: 12,
-    marginBottom: 16,
+    marginTop: 16, // Add margin top to separate from title
   },
   statItem: {
     flex: 1,
@@ -778,10 +804,21 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
   },
   checkbox: {
+    // Removed direct style, using container now
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     marginBottom: 8,
+  },
+  checkboxLabel: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#334155',
   },
   toggleButton: {
     marginVertical: 8,
+    alignSelf: 'flex-start', // Align button to the left
   },
   errorText: {
     color: '#ef4444',
@@ -796,26 +833,25 @@ const styles = StyleSheet.create({
   button: {
     minWidth: 120,
   },
-  modal: {
+  selectButton: {
     backgroundColor: '#ffffff',
-    margin: 20,
-    borderRadius: 12,
-    padding: 16,
+    borderColor: '#cbd5e1',
+    height: 56,
+    justifyContent: 'center',
   },
-  modalContent: {
-    gap: 8,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 16,
-  },
-  creditorButton: {
+  selectButtonContent: {
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    height: '100%',
   },
-  chevron: {
-    marginLeft: 8,
+  selectButtonLabel: {
+    fontSize: 16,
+    color: '#1e293b',
+    textAlign: 'left',
+    flex: 1,
+  },
+  errorBorder: {
+    borderColor: '#ef4444',
   },
 });

@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Platform } from 'react-native';
-import { Text, TextInput, Button, HelperText, Menu } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Platform, Pressable } from 'react-native';
+import { Text, TextInput, Button, HelperText } from 'react-native-paper';
 import { useRouter } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
-import { IndianRupee, ArrowLeft, Save, ChevronDown } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { IndianRupee, ArrowLeft, Save, ChevronDown, User } from 'lucide-react-native'; // Added User icon
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'; // Added FadeInUp
 import { LinearGradient } from 'expo-linear-gradient';
 import { fetchCreditors, generatePurchaseNumber, createPurchase, updateCreditorOutstandingAmount, Creditor } from '../../../lib/api/purchases';
+import SearchableSelectModal from '@/app/components/ui/SearchableSelectModal'; // Corrected path alias to include 'app'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Import safe area hook
 
 type FormData = {
   purchaseNumber: string;
@@ -26,6 +28,7 @@ type FormErrors = Partial<Record<keyof FormData, string>> & {
 export default function NewPurchaseScreen() {
   const router = useRouter();
   const { selectedBusiness } = useBusiness();
+  const insets = useSafeAreaInsets(); // Get safe area insets
   
   const [formData, setFormData] = useState<FormData>({
     purchaseNumber: '',
@@ -41,7 +44,8 @@ export default function NewPurchaseScreen() {
   const [errors, setErrors] = useState<FormErrors>({});
   const [loading, setLoading] = useState(false);
   const [creditors, setCreditors] = useState<Creditor[]>([]);
-  const [showCreditorMenu, setShowCreditorMenu] = useState(false);
+  const [isCreditorModalVisible, setIsCreditorModalVisible] = useState(false); // State for modal visibility
+  const [fetchingCreditors, setFetchingCreditors] = useState(true); // Added loading state for creditors
 
   useEffect(() => {
     if (selectedBusiness) {
@@ -64,6 +68,7 @@ export default function NewPurchaseScreen() {
     if (!selectedBusiness) return;
     
     try {
+      setFetchingCreditors(true); // Set loading true
       const [purchaseNumber, creditorsList] = await Promise.all([
         generatePurchaseNumber(selectedBusiness.id),
         fetchCreditors(selectedBusiness.id)
@@ -74,6 +79,9 @@ export default function NewPurchaseScreen() {
     } catch (err) {
       console.error('Error initializing form:', err);
       setErrors(prev => ({ ...prev, submit: 'Failed to initialize form' }));
+    }
+    finally {
+      setFetchingCreditors(false); // Set loading false
     }
   };
 
@@ -157,18 +165,17 @@ export default function NewPurchaseScreen() {
         colors={['#1e40af', '#1e3a8a']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: insets.top + 10 }]} // Use safe area inset
       >
         <View style={styles.headerContent}>
-          <Button
-            mode="text"
+          <Pressable
             onPress={() => router.back()}
-            icon={() => <ArrowLeft size={20} color="#ffffff" />}
-            textColor="#ffffff"
             style={styles.backButton}
+            hitSlop={10}
+            aria-label="Go back"
           >
-            Back
-          </Button>
+            <ArrowLeft size={24} color="#ffffff" />
+          </Pressable>
           <View style={styles.headerText}>
             <Text variant="titleLarge" style={styles.title}>New Purchase</Text>
             <Text variant="bodyMedium" style={styles.subtitle}>
@@ -179,7 +186,7 @@ export default function NewPurchaseScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.form}>
+        <Animated.View style={styles.form} entering={FadeInUp.duration(400).delay(100)}>
           <Animated.View entering={FadeInDown.duration(300).delay(100)}>
             <TextInput
               mode="outlined"
@@ -209,39 +216,17 @@ export default function NewPurchaseScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(300).delay(300)}>
-            <Menu
-              visible={showCreditorMenu}
-              onDismiss={() => setShowCreditorMenu(false)}
-              anchor={
-                <Button
-                  mode="outlined"
-                  onPress={() => setShowCreditorMenu(true)}
-                  style={styles.input}
-                  contentStyle={styles.creditorButton}
-                >
-                  {selectedCreditor ? selectedCreditor.name : 'Select Supplier (Optional)'}
-                  <ChevronDown size={20} style={styles.chevron} />
-                </Button>
-              }
+            <Button
+              mode="outlined"
+              onPress={() => setIsCreditorModalVisible(true)}
+              style={styles.selectButton}
+              contentStyle={styles.selectButtonContent}
+              labelStyle={styles.selectButtonLabel}
+              disabled={fetchingCreditors}
+              icon={() => <User size={18} color="#64748b" />}
             >
-              <Menu.Item
-                onPress={() => {
-                  setFormData(prev => ({ ...prev, creditorId: '' }));
-                  setShowCreditorMenu(false);
-                }}
-                title="No Supplier"
-              />
-              {creditors.map((creditor) => (
-                <Menu.Item
-                  key={creditor.id}
-                  onPress={() => {
-                    setFormData(prev => ({ ...prev, creditorId: creditor.id }));
-                    setShowCreditorMenu(false);
-                  }}
-                  title={creditor.name}
-                />
-              ))}
-            </Menu>
+              {selectedCreditor ? selectedCreditor.name : 'Select Supplier (Optional)'}
+            </Button>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(300).delay(400)}>
@@ -340,8 +325,26 @@ export default function NewPurchaseScreen() {
               Create Purchase
             </Button>
           </View>
-        </View>
+        </Animated.View> {/* End Form Animated.View */}
       </ScrollView>
+
+      {/* Creditor Selection Modal */}
+      <SearchableSelectModal
+        visible={isCreditorModalVisible}
+        onDismiss={() => setIsCreditorModalVisible(false)}
+        items={creditors}
+        onSelect={(creditor: Creditor | null) => {
+          setFormData(prev => ({ ...prev, creditorId: creditor?.id || '' }));
+          setIsCreditorModalVisible(false);
+        }}
+        title="Select Supplier"
+        labelKey="name"
+        descriptionKey={(item: Creditor) => `Outstanding: ₹${item.outstanding_amount.toLocaleString()}`}
+        searchKeys={['name']}
+        loading={fetchingCreditors}
+        allowClear={true}
+        clearLabel="No Supplier"
+      />
     </View>
   );
 }
@@ -352,16 +355,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8fafc',
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 20, // Increased bottom padding
+    borderBottomLeftRadius: 16, // Add subtle rounding
+    borderBottomRightRadius: 16,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   backButton: {
-    marginRight: 16,
+    marginRight: 12,
+    padding: 8, // Add padding for easier touch
+    borderRadius: 16, // Make it round
   },
   headerText: {
     flex: 1,
@@ -382,7 +388,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   input: {
-    marginBottom: 8,
+    marginBottom: 16, // Increased spacing between inputs
     backgroundColor: '#ffffff',
   },
   row: {
@@ -412,10 +418,28 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
   creditorButton: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    // Styles replaced by selectButton styles
   },
   chevron: {
-    marginLeft: 8,
+    // Styles replaced by selectButton styles
+  },
+  selectButton: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
+    height: 56,
+    justifyContent: 'center',
+    marginBottom: 16, // Match input spacing
+  },
+  selectButtonContent: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    height: '100%',
+  },
+  selectButtonLabel: {
+    fontSize: 16,
+    color: '#1e293b',
+    textAlign: 'left',
+    flex: 1,
   },
 });

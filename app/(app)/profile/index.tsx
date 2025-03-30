@@ -139,6 +139,24 @@ export default function ProfileScreen() {
               <Text style={styles.profileName}>{profile.full_name || 'User'}</Text>
               <Text style={styles.profileEmail}>{session?.user?.email}</Text>
             </View>
+
+            {/* Sign Out Button Moved Here */}
+            <AnimatedView
+              entering={FadeInUp.duration(300).delay(500)}
+              style={styles.headerSignOutButtonContainer} // New style for positioning
+            >
+              <Button
+                mode="contained"
+                onPress={signOut}
+                style={styles.signOutButton} // Keep original style for now, might need adjustment
+                contentStyle={styles.signOutContent}
+                icon={() => <LogOut size={20} color="#ffffff" strokeWidth={2.5} />}
+              >
+                Sign Out
+              </Button>
+            </AnimatedView>
+            {/* End Sign Out Button */}
+
           </Animated.View>
         </View>
 
@@ -324,20 +342,7 @@ export default function ProfileScreen() {
             </View>
           </AnimatedView>
 
-          <AnimatedView 
-            entering={FadeInUp.duration(300).delay(500)}
-            style={styles.section}
-          >
-            <Button
-              mode="contained"
-              onPress={signOut}
-              style={styles.signOutButton}
-              contentStyle={styles.signOutContent}
-              icon={() => <LogOut size={20} color="#ffffff" strokeWidth={2.5} />}
-            >
-              Sign Out
-            </Button>
-          </AnimatedView>
+          {/* Removed Sign Out Button From Here */}
         </View>
       </ScrollView>
 
@@ -699,5 +704,11 @@ const styles = StyleSheet.create({
   modalButton: {
     minWidth: 100,
     borderRadius: 24,
+  },
+  headerSignOutButtonContainer: { // Added style for positioning
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 60 : 48, // Align with top padding
+    right: 16,
+    zIndex: 10, // Ensure it's above other header elements if needed
   },
 });

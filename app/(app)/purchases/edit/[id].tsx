@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, Platform } from 'react-native';
-import { Text, TextInput, Button, HelperText, Menu } from 'react-native-paper';
+import { View, StyleSheet, ScrollView, Platform, Pressable } from 'react-native';
+import { Text, TextInput, Button, HelperText, ActivityIndicator } from 'react-native-paper'; // Removed Menu, Added ActivityIndicator
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { supabase } from '@/lib/supabase';
-import { IndianRupee, ArrowLeft, Save, ChevronDown } from 'lucide-react-native';
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import { IndianRupee, ArrowLeft, Save, ChevronDown, User } from 'lucide-react-native'; // Added User icon
+import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated'; // Added FadeInUp
 import { LinearGradient } from 'expo-linear-gradient';
 import { 
   fetchCreditors, 
@@ -14,6 +14,8 @@ import {
   Creditor,
   Purchase 
 } from '../../../../lib/api/purchases';
+import SearchableSelectModal from '@/app/components/ui/SearchableSelectModal'; // Use correct path alias
+import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Import safe area hook
 
 type FormData = {
   purchaseNumber: string;
@@ -34,6 +36,7 @@ export default function EditPurchaseScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { selectedBusiness } = useBusiness();
+  const insets = useSafeAreaInsets(); // Get safe area insets
   
   const [formData, setFormData] = useState<FormData>({
     purchaseNumber: '',
@@ -51,7 +54,8 @@ export default function EditPurchaseScreen() {
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [creditors, setCreditors] = useState<Creditor[]>([]);
-  const [showCreditorMenu, setShowCreditorMenu] = useState(false);
+  const [isCreditorModalVisible, setIsCreditorModalVisible] = useState(false); // State for modal
+  const [fetchingCreditors, setFetchingCreditors] = useState(true); // State for creditor loading
 
   useEffect(() => {
     if (selectedBusiness && id) {
@@ -111,11 +115,15 @@ export default function EditPurchaseScreen() {
   const loadCreditors = async () => {
     if (!selectedBusiness) return;
     
+    setFetchingCreditors(true);
     try {
       const creditorsList = await fetchCreditors(selectedBusiness.id);
       setCreditors(creditorsList);
     } catch (err) {
       console.error('Error fetching creditors:', err);
+    }
+    finally {
+      setFetchingCreditors(false);
     }
   };
 
@@ -247,7 +255,9 @@ export default function EditPurchaseScreen() {
   if (fetchLoading) {
     return (
       <View style={styles.container}>
-        <View style={styles.loadingContainer}>
+        {/* Improved Loading State */}
+        <View style={styles.centeredContainer}>
+          <ActivityIndicator animating={true} size="large" />
           <Text>Loading purchase details...</Text>
         </View>
       </View>
@@ -260,18 +270,17 @@ export default function EditPurchaseScreen() {
         colors={['#1e40af', '#1e3a8a']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.header}
+        style={[styles.header, { paddingTop: insets.top + 10 }]} // Use safe area inset
       >
         <View style={styles.headerContent}>
-          <Button
-            mode="text"
+          <Pressable
             onPress={() => router.back()}
-            icon={() => <ArrowLeft size={20} color="#ffffff" />}
-            textColor="#ffffff"
             style={styles.backButton}
+            hitSlop={10}
+            aria-label="Go back"
           >
-            Back
-          </Button>
+            <ArrowLeft size={24} color="#ffffff" />
+          </Pressable>
           <View style={styles.headerText}>
             <Text variant="titleLarge" style={styles.title}>Edit Purchase</Text>
             <Text variant="bodyMedium" style={styles.subtitle}>
@@ -282,7 +291,7 @@ export default function EditPurchaseScreen() {
       </LinearGradient>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.form}>
+        <Animated.View style={styles.form} entering={FadeInUp.duration(400).delay(100)}>
           <Animated.View entering={FadeInDown.duration(300).delay(100)}>
             <TextInput
               mode="outlined"
@@ -312,39 +321,18 @@ export default function EditPurchaseScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(300).delay(300)}>
-            <Menu
-              visible={showCreditorMenu}
-              onDismiss={() => setShowCreditorMenu(false)}
-              anchor={
-                <Button
-                  mode="outlined"
-                  onPress={() => setShowCreditorMenu(true)}
-                  style={styles.input}
-                  contentStyle={styles.creditorButton}
-                >
-                  {selectedCreditor ? selectedCreditor.name : 'Select Supplier (Optional)'}
-                  <ChevronDown size={20} style={styles.chevron} />
-                </Button>
-              }
+            {/* Replace Menu with Button triggering SearchableSelectModal */}
+            <Button
+              mode="outlined"
+              onPress={() => setIsCreditorModalVisible(true)}
+              style={styles.selectButton}
+              contentStyle={styles.selectButtonContent}
+              labelStyle={styles.selectButtonLabel}
+              disabled={fetchingCreditors}
+              icon={() => <User size={18} color="#64748b" />}
             >
-              <Menu.Item
-                onPress={() => {
-                  setFormData(prev => ({ ...prev, creditorId: '' }));
-                  setShowCreditorMenu(false);
-                }}
-                title="No Supplier"
-              />
-              {creditors.map((creditor) => (
-                <Menu.Item
-                  key={creditor.id}
-                  onPress={() => {
-                    setFormData(prev => ({ ...prev, creditorId: creditor.id }));
-                    setShowCreditorMenu(false);
-                  }}
-                  title={creditor.name}
-                />
-              ))}
-            </Menu>
+              {selectedCreditor ? selectedCreditor.name : 'Select Supplier (Optional)'}
+            </Button>
           </Animated.View>
 
           <Animated.View entering={FadeInDown.duration(300).delay(400)}>
@@ -443,8 +431,26 @@ export default function EditPurchaseScreen() {
               Save Changes
             </Button>
           </View>
-        </View>
+        </Animated.View> {/* End Form Animated.View */}
       </ScrollView>
+
+      {/* Creditor Selection Modal */}
+      <SearchableSelectModal
+        visible={isCreditorModalVisible}
+        onDismiss={() => setIsCreditorModalVisible(false)}
+        items={creditors}
+        onSelect={(creditor: Creditor | null) => {
+          setFormData(prev => ({ ...prev, creditorId: creditor?.id || '' }));
+          setIsCreditorModalVisible(false);
+        }}
+        title="Select Supplier"
+        labelKey="name"
+        descriptionKey={(item: Creditor) => `Outstanding: ₹${item.outstanding_amount.toLocaleString()}`}
+        searchKeys={['name']}
+        loading={fetchingCreditors}
+        allowClear={true}
+        clearLabel="No Supplier"
+      />
     </View>
   );
 }
@@ -454,22 +460,26 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8fafc',
   },
-  loadingContainer: {
+  centeredContainer: { // Renamed loadingContainer
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 16,
   },
   header: {
-    paddingTop: Platform.OS === 'ios' ? 60 : 48,
     paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingBottom: 20, // Increased bottom padding
+    borderBottomLeftRadius: 16, // Add subtle rounding
+    borderBottomRightRadius: 16,
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   backButton: {
-    marginRight: 16,
+    marginRight: 12,
+    padding: 8, // Add padding for easier touch
+    borderRadius: 16, // Make it round
   },
   headerText: {
     flex: 1,
@@ -490,7 +500,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   input: {
-    marginBottom: 8,
+    marginBottom: 16, // Increased spacing
     backgroundColor: '#ffffff',
   },
   row: {
@@ -520,10 +530,28 @@ const styles = StyleSheet.create({
     minWidth: 120,
   },
   creditorButton: {
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    // Styles replaced by selectButton styles
   },
   chevron: {
-    marginLeft: 8,
+    // Styles replaced by selectButton styles
+  },
+  selectButton: {
+    backgroundColor: '#ffffff',
+    borderColor: '#cbd5e1',
+    height: 56,
+    justifyContent: 'center',
+    marginBottom: 16, // Match input spacing
+  },
+  selectButtonContent: {
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    height: '100%',
+  },
+  selectButtonLabel: {
+    fontSize: 16,
+    color: '#1e293b',
+    textAlign: 'left',
+    flex: 1,
   },
 });
