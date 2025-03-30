@@ -49,16 +49,29 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
   const loadSelectedBusiness = async () => {
     try {
-      const storedId = await AsyncStorage.getItem(SELECTED_BUSINESS_KEY);
-      if (storedId) {
+      const storedData = await AsyncStorage.getItem(SELECTED_BUSINESS_KEY);
+      if (storedData) {
+       let parsedData;
+         if (storedData.trim().startsWith('{')) {
+           parsedData = JSON.parse(storedData);
+         } else {
+           parsedData = { id: storedData, expiry: null };
+         }
+         const { id, expiry } = parsedData;
+         if (expiry && new Date(expiry) > new Date()) {
+  
         const { data: business } = await supabase
-          .from('businesses')
-          .select('*')
-          .eq('id', storedId)
+            .from('businesses')
+            .select('*')
+            .eq('id', id)
+  
           .single();
           
-        if (business) {
-          setSelectedBusiness(business);
+if (business) {
+            setSelectedBusiness(business);
+          }
+        } else {
+          await AsyncStorage.removeItem(SELECTED_BUSINESS_KEY);
         }
       }
     } catch (err) {
@@ -93,7 +106,11 @@ export function BusinessProvider({ children }: { children: React.ReactNode }) {
 
   const selectBusiness = async (business: Business) => {
     try {
-      await AsyncStorage.setItem(SELECTED_BUSINESS_KEY, business.id);
+      const dataToStore = JSON.stringify({
+        id: business.id,
+        expiry: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+      });
+      await AsyncStorage.setItem(SELECTED_BUSINESS_KEY, dataToStore);
       setSelectedBusiness(business);
     } catch (err) {
       console.error('Error saving selected business:', err);

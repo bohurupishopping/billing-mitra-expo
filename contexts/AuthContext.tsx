@@ -25,7 +25,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (mounted.current) {
-        setSession(session);
+        const storedExpiry = localStorage.getItem('extendedSessionExpiry');
+        if (session && storedExpiry && new Date(storedExpiry) > new Date()) {
+          setSession(session);
+        } else {
+          setSession(null);
+          localStorage.removeItem('extendedSessionExpiry');
+        }
         setLoading(false);
       }
     });
@@ -34,6 +40,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (mounted.current) {
         setSession(session);
+        if (session) {
+          localStorage.setItem('extendedSessionExpiry', new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString());
+        } else {
+          localStorage.removeItem('extendedSessionExpiry');
+        }
       }
     });
 
