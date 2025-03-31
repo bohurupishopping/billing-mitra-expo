@@ -401,41 +401,8 @@ export default function PaymentForm({ onSuccess, onCancel }: PaymentFormProps) {
   return (
     // Removed outer container View, parent modal provides it
     <> 
-      {/* Stats Container */}
-      <Surface style={styles.statsContainer}>
-         <View style={styles.statItem}>
-           <View style={[styles.statIcon, { backgroundColor: 'rgba(79, 70, 229, 0.1)' }]}>
-             <CreditCard size={16} color="#4f46e5" strokeWidth={2.5} />
-           </View>
-           <View style={styles.statInfo}>
-             <Text style={styles.statLabel}>Payment Number</Text>
-             <Text style={styles.statValue}>{formData.paymentNumber || '...'}</Text> 
-           </View>
-         </View>
-         <View style={styles.statDivider} />
-         <View style={styles.statItem}>
-           <View style={[styles.statIcon, { backgroundColor: 'rgba(79, 70, 229, 0.1)' }]}>
-             <IndianRupee size={16} color="#4f46e5" strokeWidth={2.5} />
-           </View>
-           <View style={styles.statInfo}>
-             <Text style={styles.statLabel}>Amount</Text>
-             <Text style={styles.statValue}>₹{formData.amount || '0.00'}</Text>
-           </View>
-         </View>
-         <View style={styles.statDivider} />
-         <View style={styles.statItem}>
-           <View style={[styles.statIcon, { backgroundColor: 'rgba(79, 70, 229, 0.1)' }]}>
-             <Calendar size={16} color="#4f46e5" strokeWidth={2.5} />
-           </View>
-           <View style={styles.statInfo}>
-             <Text style={styles.statLabel}>Payment Date</Text>
-             <Text style={styles.statValue}>
-               {format(new Date(formData.paymentDate), 'MMM dd, yyyy')}
-             </Text>
-           </View>
-         </View>
-      </Surface>
-
+      
+    
       {/* Main Content Area: Form or Selection List */}
       {/* Wrap in a View to manage layout, padding is handled by parent ScrollView */}
       <View style={[styles.formContentContainer]}> 
