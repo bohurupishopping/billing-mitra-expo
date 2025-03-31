@@ -2,7 +2,7 @@
   "expo": {
     "name": "Billing Mitra",
     "slug": "billing-mitra",
-    "version": "1.0.0",
+    "version": "1.9.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -11,6 +11,13 @@
     "ios": {
       "supportsTablet": true
     },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.x_pritam.billingmitra"
+    },
     "web": {
       "bundler": "metro",
       "output": "single",
@@ -18,7 +25,17 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ]
+
     ],
     "experiments": {
       "typedRoutes": true
@@ -31,9 +48,7 @@
         "projectId": "1a5371b8-4359-445e-9042-6a8a9213f982"
       }
     },
-    "owner": "x_pritam",
-    "android": {
-      "package": "com.x_pritam.billingmitra"
-    }
+    "owner": "x_pritam"
+   
   }
 }
