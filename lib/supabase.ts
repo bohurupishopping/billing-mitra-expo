@@ -4,11 +4,11 @@ import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/constants/Config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 if (!SUPABASE_URL) {
-  throw new Error('EXPO_PUBLIC_SUPABASE2_URL is required');
+  throw new Error('EXPO_PUBLIC_SUPABASE_URL is required');
 }
 
 if (!SUPABASE_ANON_KEY) {
-  throw new Error('EXPO_PUBLIC_SUPABASE2_ANON_KEY is required');
+  throw new Error('EXPO_PUBLIC_SUPABASE_ANON_KEY is required');
 }
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
