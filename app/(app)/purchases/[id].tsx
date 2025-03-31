@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, RefreshControl, Pressable, Platform } from 'react-native';
-import { Text, Button, IconButton, Portal, Dialog, ActivityIndicator } from 'react-native-paper'; // Added ActivityIndicator
+import { View, StyleSheet, ScrollView, RefreshControl, Pressable, Platform, StatusBar } from 'react-native';
+import { Text, Button, IconButton, Portal, Dialog, ActivityIndicator, useTheme } from 'react-native-paper';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useBusiness } from '@/contexts/BusinessContext';
 import { supabase } from '@/lib/supabase';
 import { format } from 'date-fns';
 import { Calendar, ShoppingBag, User, Trash2, CircleAlert as AlertCircle, Pencil, IndianRupee, ArrowLeft } from 'lucide-react-native';
-import Animated, { FadeInUp } from 'react-native-reanimated'; // Changed to FadeInUp
+import Animated, { FadeInUp, FadeIn } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useSafeAreaInsets } from 'react-native-safe-area-context'; // Import safe area hook
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Purchase = {
   id: string;
@@ -29,7 +29,8 @@ export default function PurchaseDetailScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { selectedBusiness } = useBusiness();
-  const insets = useSafeAreaInsets(); // Get safe area insets
+  const insets = useSafeAreaInsets();
+  const theme = useTheme();
   
   const [purchase, setPurchase] = useState<Purchase | null>(null);
   const [loading, setLoading] = useState(true);
@@ -89,16 +90,17 @@ export default function PurchaseDetailScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
+      <StatusBar barStyle="light-content" />
       <LinearGradient
-        colors={['#1e40af', '#1e3a8a']}
+        colors={[theme.colors.primary, theme.colors.primaryContainer]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 10 }]} // Use safe area inset
+        style={styles.header}
       >
         <View style={styles.headerContent}>
           <Pressable
-            onPress={() => router.back()}
+            onPress={() => router.push('/purchases')}
             style={styles.backButton}
             hitSlop={10}
             aria-label="Go back"
@@ -116,15 +118,19 @@ export default function PurchaseDetailScreen() {
           <View style={styles.headerActions}>
             <IconButton
               icon={() => <Pencil size={20} color="#ffffff" />}
-              style={styles.headerActionButton}
+              style={[styles.headerActionButton, styles.editButton]}
               onPress={() => router.push(`/purchases/edit/${id}`)}
-              disabled={!purchase} // Disable if no purchase data
+              disabled={!purchase}
+              mode="contained"
+              containerColor="rgba(255, 255, 255, 0.2)"
             />
             <IconButton
               icon={() => <Trash2 size={20} color="#ffffff" />}
-              style={styles.headerActionButton}
+              style={[styles.headerActionButton, styles.deleteButton]}
               onPress={() => setShowDeleteDialog(true)}
-              disabled={!purchase} // Disable if no purchase data
+              disabled={!purchase}
+              mode="contained"
+              containerColor="rgba(239, 68, 68, 0.2)"
             />
           </View>
         </View>
@@ -243,9 +249,23 @@ export default function PurchaseDetailScreen() {
               Are you sure you want to delete this purchase? This action cannot be undone.
             </Text>
           </Dialog.Content>
-          <Dialog.Actions>
-            <Button onPress={() => setShowDeleteDialog(false)}>Cancel</Button>
-            <Button onPress={handleDelete} textColor="#ef4444">Delete</Button>
+          <Dialog.Actions style={styles.dialogActions}>
+            <Button 
+              mode="outlined" 
+              onPress={() => setShowDeleteDialog(false)}
+              style={styles.dialogButton}
+              labelStyle={styles.dialogButtonLabel}
+            >
+              Cancel
+            </Button>
+            <Button 
+              mode="contained" 
+              onPress={handleDelete} 
+              style={[styles.dialogButton, styles.dialogDeleteButton]}
+              buttonColor="#ef4444"
+            >
+              Delete
+            </Button>
           </Dialog.Actions>
         </Dialog>
       </Portal>
@@ -260,18 +280,22 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingBottom: 20, // Increased bottom padding
-    borderBottomLeftRadius: 16, // Add subtle rounding
-    borderBottomRightRadius: 16,
+    paddingVertical: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingTop: 8,
   },
   backButton: {
     marginRight: 12,
-    padding: 8, // Add padding for easier touch
-    borderRadius: 16, // Make it round
+    padding: 8,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
   headerText: {
     flex: 1,
@@ -286,11 +310,35 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   headerActions: {
-    // Styles for header action buttons
     flexDirection: 'row',
+    gap: 8,
   },
   headerActionButton: {
-    margin: -8, // Reduce default margin to bring icons closer
+    margin: 0,
+    borderRadius: 12,
+  },
+  editButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  deleteButton: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  dialogActions: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    gap: 12,
+  },
+  dialogButton: {
+    flex: 1,
+    borderRadius: 12,
+    paddingVertical: 6,
+  },
+  dialogButtonLabel: {
+    fontSize: 16,
+    letterSpacing: 0,
+  },
+  dialogDeleteButton: {
+    borderWidth: 0,
   },
   content: {
     flex: 1,
@@ -319,16 +367,14 @@ const styles = StyleSheet.create({
   },
   detailsContainer: {
     padding: 16,
+    gap: 16,
   },
   detailsCard: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    elevation: 1, // Add subtle shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#f1f5f9',
   },
   detailRow: {
     flexDirection: 'row',
