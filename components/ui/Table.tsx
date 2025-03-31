@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { router } from 'expo-router'; // Assuming navigation might be needed
 import Animated, { FadeInUp } from 'react-native-reanimated';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronRight, ChevronLeft } from 'lucide-react-native'; // Added ChevronLeft
 
 const AnimatedView = Animated.createAnimatedComponent(View);
 
@@ -26,7 +26,14 @@ interface TableProps<T> {
   loading?: boolean; // Optional loading state
   emptyMessage?: string; // Message when data is empty
   EmptyStateComponent?: React.ComponentType<any>; // Custom component for empty state
+  // Pagination Props
+  currentPage?: number;
+  totalItems?: number;
+  onPageChange?: (page: number) => void;
+  itemsPerPage?: number; // Added itemsPerPage prop
 }
+
+const ITEMS_PER_PAGE = 12; // Default items per page
 
 export function Table<T>({
   columns,
@@ -40,19 +47,50 @@ export function Table<T>({
   loading = false,
   emptyMessage = "No data available",
   EmptyStateComponent,
+  // Pagination Props
+  currentPage: initialCurrentPage = 1, // Default to page 1 if not provided
+  totalItems,
+  onPageChange,
+  itemsPerPage = ITEMS_PER_PAGE, // Use default or provided value
 }: TableProps<T>) {
+
+  const [currentPage, setCurrentPage] = useState(initialCurrentPage);
+
+  // Update internal state if the prop changes
+  React.useEffect(() => {
+    setCurrentPage(initialCurrentPage);
+  }, [initialCurrentPage]);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    if (onPageChange) {
+      onPageChange(newPage);
+    }
+  };
+
+  // Calculate pagination details only if pagination props are provided
+  const isPaginated = typeof totalItems === 'number' && typeof handlePageChange === 'function';
+  const totalPages = isPaginated ? Math.ceil(totalItems / itemsPerPage) : 1;
+  const startIndex = isPaginated ? (currentPage - 1) * itemsPerPage : 0;
+  const endIndex = isPaginated ? Math.min(startIndex + itemsPerPage, totalItems) : data.length; // Ensure endIndex doesn't exceed totalItems
+  const paginatedData = isPaginated ? data.slice(startIndex, endIndex) : data; // Use full data if not paginated
 
   if (loading) {
     // Optional: Add a loading indicator component here
     return <Text>Loading...</Text>;
   }
 
-  if (!data || data.length === 0) {
+  // Use paginatedData length for empty check when paginated
+  const displayData = isPaginated ? paginatedData : data;
+  if (!displayData || displayData.length === 0) {
     if (EmptyStateComponent) {
       return <EmptyStateComponent />;
     }
-    return <Text style={styles.emptyText}>{emptyMessage}</Text>;
+    // Show a different message if it's paginated but the current page is empty
+    const message = isPaginated && data.length > 0 ? `No items on page ${currentPage}` : emptyMessage;
+    return <Text style={styles.emptyText}>{message}</Text>;
   }
+
 
   return (
     <View style={[styles.tableContainer, containerStyle]}>
@@ -66,11 +104,12 @@ export function Table<T>({
         {onRowPress && <View style={styles.chevronPlaceholder} />}
       </View>
 
-      {/* Data Rows */}
-      {data.map((item, index) => (
+      {/* Data Rows - Use displayData */}
+      {displayData.map((item, index) => (
         <AnimatedView
           key={getKey(item)}
-          entering={FadeInUp.duration(300).delay(index * 50)} // Shorter delay
+          // Adjust delay calculation based on the original index if needed, or keep simple
+          entering={FadeInUp.duration(300).delay(index * 50)}
           style={[styles.tableRowContainer, index % 2 !== 0 && styles.alternateRow, rowStyle]}
         >
           <Pressable
@@ -92,6 +131,45 @@ export function Table<T>({
           </Pressable>
         </AnimatedView>
       ))}
+
+      {/* Pagination Controls */}
+      {isPaginated && totalPages > 1 && (
+        <View style={styles.paginationContainer}>
+          <Pressable
+            onPress={() => handlePageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            style={({ pressed }) => [
+              styles.paginationButton,
+              currentPage === 1 && styles.paginationButtonDisabled,
+              pressed && currentPage !== 1 && styles.paginationButtonPressed,
+            ]}
+          >
+            <ChevronLeft size={18} color={currentPage === 1 ? '#94a3b8' : '#475569'} />
+            <Text style={[styles.paginationButtonText, currentPage === 1 && styles.paginationButtonTextDisabled]}>
+              Prev
+            </Text>
+          </Pressable>
+
+          <Text style={styles.paginationText}>
+            Page {currentPage} of {totalPages}
+          </Text>
+
+          <Pressable
+            onPress={() => handlePageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            style={({ pressed }) => [
+              styles.paginationButton,
+              currentPage === totalPages && styles.paginationButtonDisabled,
+              pressed && currentPage !== totalPages && styles.paginationButtonPressed,
+            ]}
+          >
+            <Text style={[styles.paginationButtonText, currentPage === totalPages && styles.paginationButtonTextDisabled]}>
+              Next
+            </Text>
+            <ChevronRight size={18} color={currentPage === totalPages ? '#94a3b8' : '#475569'} />
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
@@ -161,6 +239,48 @@ const styles = StyleSheet.create({
     padding: 20,
     color: '#64748b',
     fontSize: 14,
+  },
+  // Pagination Styles
+  paginationContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#e2e8f0',
+    backgroundColor: '#f8fafc', // Slightly different background for pagination
+  },
+  paginationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+  },
+  paginationButtonPressed: {
+    backgroundColor: '#e2e8f0',
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+  },
+  paginationButtonText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#475569',
+    marginHorizontal: 4,
+  },
+  paginationButtonTextDisabled: {
+    color: '#94a3b8',
+  },
+  paginationText: {
+    fontSize: 14,
+    color: '#64748b',
+    fontWeight: '500',
   },
 });
 

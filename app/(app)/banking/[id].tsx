@@ -196,21 +196,31 @@ export default function BankAccountDetailPage() {
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <View style={[styles.statIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-              <IndianRupee size={16} color="#ffffff" strokeWidth={2.5} />
+              <ArrowDownRight size={16} color="#ffffff" strokeWidth={2.5} />
             </View>
             <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Current Balance</Text>
-              <Text style={styles.statValue}>{formatCurrency(Number(account.current_balance))}</Text>
+              <Text style={styles.statLabel}>Deposits</Text>
+              <Text style={[styles.statValue, styles.statValueSuccess]}>{formatCurrency(totalDeposits)}</Text>
             </View>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
             <View style={[styles.statIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
-              <Calendar size={16} color="#ffffff" strokeWidth={2.5} />
+              <ArrowUpRight size={16} color="#ffffff" strokeWidth={2.5} />
             </View>
             <View style={styles.statInfo}>
-              <Text style={styles.statLabel}>Created</Text>
-              <Text style={styles.statValue}>{format(new Date(account.created_at), 'MMM dd, yyyy')}</Text>
+              <Text style={styles.statLabel}>Withdrawals</Text>
+              <Text style={[styles.statValue, styles.statValueWarning]}>{formatCurrency(totalWithdrawals)}</Text>
+            </View>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <View style={[styles.statIcon, { backgroundColor: 'rgba(255, 255, 255, 0.2)' }]}>
+              <RefreshCw size={16} color="#ffffff" strokeWidth={2.5} />
+            </View>
+            <View style={styles.statInfo}>
+              <Text style={styles.statLabel}>Transfers</Text>
+              <Text style={[styles.statValue, styles.statValueInfo]}>{formatCurrency(totalTransfers)}</Text>
             </View>
           </View>
         </View>
@@ -218,6 +228,7 @@ export default function BankAccountDetailPage() {
 
       <ScrollView 
         style={styles.content}
+        contentContainerStyle={styles.contentContainer}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -235,30 +246,7 @@ export default function BankAccountDetailPage() {
           </View>
         )}
 
-        {/* Financial Summary */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Financial Summary</Text>
-          <View style={styles.statsContainer}>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Total Deposits</Text>
-              <Text style={[styles.statValue, styles.statValueSuccess]}>
-                {formatCurrency(totalDeposits)}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Total Withdrawals</Text>
-              <Text style={[styles.statValue, styles.statValueWarning]}>
-                {formatCurrency(totalWithdrawals)}
-              </Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Total Transfers</Text>
-              <Text style={[styles.statValue, styles.statValueInfo]}>
-                {formatCurrency(totalTransfers)}
-              </Text>
-            </View>
-          </View>
-        </View>
+
 
         {/* Account Details */}
         <View style={styles.section}>
@@ -306,7 +294,7 @@ export default function BankAccountDetailPage() {
           ) : (
             <View style={styles.tableContainer}>
               <View style={styles.tableHeader}>
-                <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Type</Text>
+                <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Type</Text>
                 <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Date</Text>
                 <Text style={[styles.tableHeaderCell, { flex: 1.2 }]}>Description</Text>
                 <Text style={[styles.tableHeaderCell, { flex: 0.8 }]}>Amount</Text>
@@ -323,16 +311,13 @@ export default function BankAccountDetailPage() {
                       pressed && styles.tableRowPressed
                     ]}
                   >
-                    <View style={[styles.tableCellContainer, { flex: 1.2 }]}>
+                    <View style={[styles.tableCellContainer, { flex: 0.8 }]}>
                       <View style={styles.transactionIcon}>
                         {getTransactionIcon(transaction.type)}
                       </View>
-                      <Text style={styles.tableCellText} numberOfLines={1}>
-                        {transaction.type.charAt(0).toUpperCase() + transaction.type.slice(1)}
-                      </Text>
                     </View>
                     <Text style={[styles.tableCellText, { flex: 1 }]}>
-                      {format(new Date(transaction.date), 'MMM dd, yyyy')}
+                      {format(new Date(transaction.date), 'dd/MM/yy')}
                     </Text>
                     <Text style={[styles.tableCellText, { flex: 1.2 }]} numberOfLines={1}>
                       {transaction.description}
@@ -436,6 +421,9 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     padding: 16,
+  },
+  contentContainer: {
+    paddingBottom: Platform.OS === 'ios' ? 90 : 80, // Account for bottom navigation
   },
   statsContainer: {
     flexDirection: 'row',
@@ -664,4 +652,4 @@ const styles = StyleSheet.create({
   statValueInfo: {
     color: '#2563eb',
   },
-}); 
+});

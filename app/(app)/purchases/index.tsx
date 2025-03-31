@@ -30,10 +30,10 @@ const purchaseColumns: Column<Purchase>[] = [
     key: 'purchase_date',
     header: 'Date',
     flex: 1,
-    render: (item) => format(new Date(item.purchase_date), 'MMM dd, yyyy'),
+    render: (item) => format(new Date(item.purchase_date), 'dd/MM/yy'),
   },
   {
-    key: 'creditor_name', // Custom key for rendering
+    key: 'creditor_name',
     header: 'Creditor',
     flex: 1.2,
     render: (item) => item.creditors?.name || 'N/A',
@@ -65,6 +65,7 @@ export default function PurchasesScreen() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [showSearch, setShowSearch] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1); // Add state for current page
 
   const fetchPurchases = async () => {
     if (!selectedBusiness) return;
@@ -122,6 +123,11 @@ export default function PurchasesScreen() {
     }
   });
 
+  // Reset to page 1 when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, timeFilter]);
+
   const totalAmount = filteredPurchases.reduce((sum, purchase) => sum + purchase.total_price, 0);
   const averageAmount = filteredPurchases.length > 0 ? totalAmount / filteredPurchases.length : 0;
 
@@ -132,6 +138,12 @@ export default function PurchasesScreen() {
   const handleRowPress = useCallback((purchase: Purchase) => {
     router.push(`/purchases/${purchase.id}`);
   }, []);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    // Optional: Scroll to top when page changes
+    // scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   // Define Empty State Component for the Table
   const EmptyPurchasesTable = () => (
@@ -280,12 +292,17 @@ export default function PurchasesScreen() {
         {/* Use the reusable Table component */}
         <Table
           columns={purchaseColumns}
-          data={filteredPurchases}
+          data={filteredPurchases} // Pass the full filtered list
           getKey={(item) => item.id}
           onRowPress={handleRowPress}
           loading={loading}
           EmptyStateComponent={EmptyPurchasesTable}
-          containerStyle={styles.tableComponentContainer} // Add specific container style if needed
+          containerStyle={styles.tableComponentContainer}
+          // Pagination Props
+          currentPage={currentPage}
+          totalItems={filteredPurchases.length} // Total items in the filtered list
+          onPageChange={handlePageChange}
+          itemsPerPage={12} // Explicitly set items per page (as requested)
         />
 
       </ScrollView>

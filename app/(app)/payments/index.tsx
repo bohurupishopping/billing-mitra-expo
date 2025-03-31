@@ -36,18 +36,13 @@ type TimeFilter = 'all' | 'week' | 'month' | 'year';
 // Define columns for the reusable table
 const paymentColumns: Column<Payment>[] = [
   {
-    key: 'payment_number',
-    header: 'Payment #',
-    flex: 1.2,
-  },
-  {
     key: 'payment_date',
     header: 'Date',
     flex: 1,
-    render: (item) => format(new Date(item.payment_date), 'MMM dd, yyyy'),
+    render: (item) => format(new Date(item.payment_date), 'dd/MM/yy'),
   },
   {
-    key: 'creditor_name', // Use a custom key for rendering
+    key: 'creditor_name',
     header: 'To',
     flex: 1.2,
     render: (item) => item.creditors?.name || 'N/A',
@@ -56,6 +51,9 @@ const paymentColumns: Column<Payment>[] = [
     key: 'payment_method',
     header: 'Method',
     flex: 1,
+    render: (item) => item.payment_method === 'Bank Transfer' && item.bank_accounts
+      ? `${item.bank_accounts.name} (${item.bank_accounts.account_type})`
+      : item.payment_method,
   },
   {
     key: 'amount',
@@ -79,6 +77,7 @@ export default function PaymentsScreen() {
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('all');
   const [showSearch, setShowSearch] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1); // Add state for current page
 
   const fetchPayments = async () => {
     if (!selectedBusiness) return;
@@ -136,6 +135,11 @@ export default function PaymentsScreen() {
     }
   });
 
+  // Reset to page 1 when search or filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, timeFilter]);
+
   const totalAmount = filteredPayments.reduce((sum, payment) => sum + payment.amount, 0);
   const averageAmount = filteredPayments.length > 0 ? totalAmount / filteredPayments.length : 0;
 
@@ -146,6 +150,12 @@ export default function PaymentsScreen() {
   const handleRowPress = useCallback((payment: Payment) => {
     router.push(`/payments/${payment.id}`);
   }, []);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    // Optional: Scroll to top when page changes
+    // scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   // Define Empty State Component for the Table
   const EmptyPaymentsTable = () => (
@@ -295,12 +305,17 @@ export default function PaymentsScreen() {
         {/* Use the reusable Table component */}
         <Table
           columns={paymentColumns}
-          data={filteredPayments}
+          data={filteredPayments} // Pass the full filtered list
           getKey={(item) => item.id}
           onRowPress={handleRowPress}
           loading={loading}
           EmptyStateComponent={EmptyPaymentsTable}
-          containerStyle={styles.tableComponentContainer} // Add specific container style if needed
+          containerStyle={styles.tableComponentContainer}
+          // Pagination Props
+          currentPage={currentPage}
+          totalItems={filteredPayments.length} // Total items in the filtered list
+          onPageChange={handlePageChange}
+          itemsPerPage={12} // Explicitly set items per page
         />
 
       </ScrollView>
@@ -336,6 +351,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8fafc',
+    paddingBottom: Platform.OS === 'ios' ? 90 : 70, // Add padding for bottom navigation
   },
   header: {
     paddingTop: Platform.OS === 'ios' ? 60 : Platform.OS === 'android' ? 48 : 20,

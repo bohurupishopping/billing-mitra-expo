@@ -6,7 +6,7 @@ import { useBusiness } from '@/contexts/BusinessContext';
 import { Table, Column } from '@/components/ui/Table'; // Import the new Table component
 import { supabase } from '@/lib/supabase';
 import { Users, Building2, IndianRupee, TrendingUp, Search, Plus } from 'lucide-react-native'; // Removed Calendar, User, Wallet, Filter, ChevronRight
-// Removed format, LinearGradient, Animated imports as they are not used in the table part or header is different
+import { format } from 'date-fns';
 import { LinearGradient } from 'expo-linear-gradient'; // Re-added LinearGradient for header
 
 interface Creditor {
@@ -26,7 +26,12 @@ const creditorColumns: Column<Creditor>[] = [
     header: 'Name',
     flex: 1.5, // Keep Name column
   },
-  // Removed Contact column definition
+  {
+    key: 'created_at',
+    header: 'Date',
+    flex: 1,
+    render: (item) => format(new Date(item.created_at), 'dd/MM/yy'),
+  },
   {
     key: 'outstanding_amount',
     header: 'Outstanding', // Keep Outstanding column
@@ -47,6 +52,7 @@ export default function CreditorsScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1); // Add state for current page
 
   const fetchCreditors = async () => {
     if (!selectedBusiness) return;
@@ -87,12 +93,23 @@ export default function CreditorsScreen() {
     (creditor.phone?.toLowerCase().includes(searchQuery.toLowerCase()) || false)
   );
 
+  // Reset to page 1 when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
   const totalOutstanding = filteredCreditors.reduce((sum, creditor) => sum + creditor.outstanding_amount, 0);
   const averageOutstanding = filteredCreditors.length > 0 ? totalOutstanding / filteredCreditors.length : 0;
 
   const handleRowPress = useCallback((creditor: Creditor) => {
     router.push(`/contacts/creditors/${creditor.id}`);
   }, []);
+
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+    // Optional: Scroll to top when page changes
+    // scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+  };
 
   // Define Empty State Component for the Table
   const EmptyCreditorsTable = () => (
@@ -237,12 +254,17 @@ export default function CreditorsScreen() {
         {/* Use the reusable Table component */}
         <Table
           columns={creditorColumns}
-          data={filteredCreditors}
+          data={filteredCreditors} // Pass the full filtered list
           getKey={(item) => item.id}
           onRowPress={handleRowPress}
           loading={loading}
           EmptyStateComponent={EmptyCreditorsTable}
-          containerStyle={styles.tableComponentContainer} // Add specific container style if needed
+          containerStyle={styles.tableComponentContainer}
+          // Pagination Props
+          currentPage={currentPage}
+          totalItems={filteredCreditors.length} // Total items in the filtered list
+          onPageChange={handlePageChange}
+          itemsPerPage={12} // Explicitly set items per page
         />
 
       </ScrollView>
