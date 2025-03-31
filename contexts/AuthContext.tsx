@@ -1,8 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
 type AuthContextType = {
   session: Session | null;
   loading: boolean;
@@ -14,70 +12,35 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Storage key for auth session
-const AUTH_SESSION_KEY = '@auth:session';
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const mounted = useRef(true);
 
-  // Load session from storage on mount
   useEffect(() => {
-    const loadPersistedSession = async () => {
-      try {
-        // Set up mounted ref
-        mounted.current = true;
-        
-        // Try to get session from storage first
-        const storedSessionStr = await AsyncStorage.getItem(AUTH_SESSION_KEY);
-        let storedSession = null;
-        
-        if (storedSessionStr) {
-          storedSession = JSON.parse(storedSessionStr);
-          // If we have a stored session, set it immediately to avoid flash of login screen
-          if (mounted.current && storedSession) {
-            setSession(storedSession);
-          }
-        }
-        
-        // Get fresh session from Supabase
-        const { data: { session } } = await supabase.auth.getSession();
-        
-        if (mounted.current) {
-          setSession(session);
-          
-          // Store the fresh session
-          if (session) {
-            await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
-          } else if (storedSessionStr) {
-            // If we had a stored session but now it's gone, remove it from storage
-            await AsyncStorage.removeItem(AUTH_SESSION_KEY);
-          }
-          
-          setLoading(false);
-        }
-      } catch (error) {
-        console.error('Error loading auth session:', error);
-        if (mounted.current) {
-          setLoading(false);
-        }
-      }
-    };
-    
-    loadPersistedSession();
-    
-    // Set up auth subscription
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Set up mounted ref
+    mounted.current = true;
+
+    // Immediately try to get the session from Supabase
+    // Supabase client handles persistence via SecureStore/AsyncStorage automatically
+    supabase.auth.getSession().then(({ data: { session } }) => {
       if (mounted.current) {
         setSession(session);
-        
-        // Update stored session
-        if (session) {
-          await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session));
-        } else {
-          await AsyncStorage.removeItem(AUTH_SESSION_KEY);
-        }
+        setLoading(false); // Set loading false after initial check
+      }
+    }).catch((error) => {
+      console.error('Error getting initial session:', error);
+      if (mounted.current) {
+        setLoading(false); // Still set loading false on error
+      }
+    });
+
+    // Set up auth subscription
+    // Supabase client handles updating the persisted session on auth state change
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (mounted.current) {
+        setSession(session);
+        // No need to manually update storage here
       }
     });
     
