@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Session } from '@supabase/supabase-js';
+
 type AuthContextType = {
   session: Session | null;
   loading: boolean;
@@ -21,29 +22,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Set up mounted ref
     mounted.current = true;
 
-    // Immediately try to get the session from Supabase
-    // Supabase client handles persistence via SecureStore/AsyncStorage automatically
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (mounted.current) {
         setSession(session);
-        setLoading(false); // Set loading false after initial check
-      }
-    }).catch((error) => {
-      console.error('Error getting initial session:', error);
-      if (mounted.current) {
-        setLoading(false); // Still set loading false on error
+        setLoading(false);
       }
     });
 
     // Set up auth subscription
-    // Supabase client handles updating the persisted session on auth state change
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (mounted.current) {
         setSession(session);
-        // No need to manually update storage here
       }
     });
-    
+
     // Cleanup function
     return () => {
       mounted.current = false;
